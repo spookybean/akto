@@ -102,9 +102,8 @@ function SampleDataComponent(props) {
         const effectiveMetadata = metadata ?? sampleData?.metadata;
         const { segments: metadataSegments, fromMetadata } = selectMetadataSegments(effectiveMetadata);
         const baseSegments = sampleData?.vulnerabilitySegments || [];
-        const allSegments = metadataSegments.length > 0 ? metadataSegments : baseSegments;
-        const vulnerabilitySegments = allSegments.filter(s => s.location !== 'LOCATION_RESPONSE_BODY');
-        const responseVulnerabilitySegments = allSegments.filter(s => s.location === 'LOCATION_RESPONSE_BODY');
+        const vulnerabilitySegments = metadataSegments.length > 0 ? metadataSegments.filter(s => s.location !== 'LOCATION_RESPONSE_BODY') : baseSegments;
+        const responseVulnerabilitySegments = metadataSegments.filter(s => s.location === 'LOCATION_RESPONSE_BODY');
         const segmentsFromMetadata = fromMetadata;
 
         if(isNewDiff){
@@ -122,7 +121,7 @@ function SampleDataComponent(props) {
 
             setSampleJsonData({
                 request: requestData,
-                response: { ...responseData, vulnerabilitySegments: responseVulnerabilitySegments }
+                response: { ...responseData, vulnerabilitySegments: segmentsFromMetadata ? responseVulnerabilitySegments : vulnerabilitySegments }
             })
         }else{
             setSampleJsonData({ 
