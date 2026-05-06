@@ -207,6 +207,9 @@ function UsersAndDevices() {
             } else {
                 delete updatedFiltersMap[INVENTORY_FILTER_KEY];
             }
+            // The agent-tree subview keeps its own filter slot; clear it so the
+            // previous user's hostnames don't leak into this user's view.
+            delete updatedFiltersMap[`${INVENTORY_FILTER_KEY}agent-tree/`];
 
             setFiltersMap(updatedFiltersMap);
 
@@ -264,7 +267,7 @@ function UsersAndDevices() {
                 filters={[]}
                 headers={headers}
                 selectable={selectedTab === 'users'}
-                mode={IndexFiltersMode.Default}
+                mode={IndexFiltersMode.Filtering}
                 headings={headers}
                 useNewRow={true}
                 condensedHeight={true}

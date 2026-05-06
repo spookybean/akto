@@ -233,6 +233,7 @@ def _load_mcp_config_aliases() -> Dict[str, str]:
 
 
 def extract_mcp_server_name(input_data: Dict[str, Any]) -> str:
+    logger.info(f"input_data: {input_data}")
     """Extract MCP server identifier from Cursor hook input."""
     # Priority: configured alias from ~/.cursor/mcp.json > server field > url host > command > tool_name prefix > default
     aliases = _load_mcp_config_aliases()
@@ -328,10 +329,10 @@ def build_validation_request(tool_name: str, tool_input_obj: Any, mcp_server_nam
         "destIp": "127.0.0.1",
         "time": str(int(time.time() * 1000)),
         "statusCode": "200",
-        "type": None,
+        "type": "HTTP/1.1",
         "status": "200",
         "akto_account_id": "1000000",
-        "akto_vxlan_id": DEVICE_ID,
+        "akto_vxlan_id": 0,
         "is_pending": "false",
         "source": "MIRRORING",
         "direction": None,

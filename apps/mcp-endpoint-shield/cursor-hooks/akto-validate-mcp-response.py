@@ -235,6 +235,16 @@ def extract_mcp_server_name(input_data: Dict[str, Any]) -> str:
     if url:
         # Extract domain from URL
         return url.replace("https://", "").replace("http://", "").split("/")[0]
+    # Check url inside tool_input JSON string
+    tool_input_raw = input_data.get("tool_input", "")
+    if tool_input_raw:
+        try:
+            tool_input_dict = json.loads(tool_input_raw) if isinstance(tool_input_raw, str) else tool_input_raw
+            if isinstance(tool_input_dict, dict):
+                if nested_url := tool_input_dict.get("url"):
+                    return nested_url.replace("https://", "").replace("http://", "").split("/")[0]
+        except (json.JSONDecodeError, TypeError):
+            pass
     if command:
         return command
     if tool_name := input_data.get("tool_name", ""):
@@ -303,8 +313,6 @@ def build_ingestion_payload(tool_name: str, tool_input_obj: Any, tool_response_o
         "x-mcp-server": mcp_server_name,
         "content-type": "application/json"
     })
-
-    # Build response headers as JSON string
     response_headers = json.dumps({
         "x-cursor-hook": "afterMCPExecution",
         "content-type": "application/json"
@@ -327,10 +335,10 @@ def build_ingestion_payload(tool_name: str, tool_input_obj: Any, tool_response_o
         "destIp": "127.0.0.1",
         "time": str(int(time.time() * 1000)),
         "statusCode": "200",
-        "type": None,
+        "type": "HTTP/1.1",
         "status": "200",
         "akto_account_id": "1000000",
-        "akto_vxlan_id": DEVICE_ID,
+        "akto_vxlan_id": 0,
         "is_pending": "false",
         "source": "MIRRORING",
         "direction": None,
