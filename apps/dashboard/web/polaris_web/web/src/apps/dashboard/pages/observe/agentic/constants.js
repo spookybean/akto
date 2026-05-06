@@ -478,17 +478,33 @@ export const groupCollectionsByUser = (collections, trafficMap = {}, sensitiveMa
                 sensitiveTypes: new Set(),
                 maxTrafficTimestamp: 0,
                 maxRiskScore: 0,
+                uniqueSkillNames: new Set(),
+                nonSkillCollectionsCount: 0,
                 team: meta.team || '',
                 userRole: meta.userRole || '',
             };
         }
         const g = users[username];
         g.collections.push(c);
-        g.clientTypes.add(getTypeFromTags(c.envType));
+        const category = getTypeFromTags(c.envType);
+        g.clientTypes.add(category);
+        if (category !== CLIENT_TYPES.SKILL) {
+            g.nonSkillCollectionsCount += 1;
+        }
+        if (Array.isArray(c.skills)) {
+            c.skills.forEach(s => { if (s) g.uniqueSkillNames.add(String(s).toLowerCase()); });
+        }
         accumulateHostGroupedCollection(g, c, trafficMap, sensitiveMap, riskScoreMap);
     });
 
-    return Object.values(users).map((g) => finalizeHostGroupedRow(g, "user"));
+    // Per-user "Agentic assets" count uses the same semantic as the Agentic assets totals page:
+    // non-Skill collections + unique skill names (from c.skills[] across all the user's collections).
+    // Counting hostNames alone hides skills bundled inside AI Agent / MCP Server collections.
+    return Object.values(users).map((g) => {
+        const row = finalizeHostGroupedRow(g, "user");
+        row.endpointsCount = g.nonSkillCollectionsCount + g.uniqueSkillNames.size;
+        return row;
+    });
 };
 
 export const createEnvTypeFilter = (values, negated = false) => ({

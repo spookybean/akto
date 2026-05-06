@@ -150,7 +150,7 @@ function UsersAndDevices() {
         const rows = selectedTab === "users" ? data.users : data.devices;
         setSummaryData({
             profileCount: selectedTab === "users" ? userLen : deviceLen,
-            collectionCount: rows.reduce((sum, row) => sum + (row.hostNames?.length || 0), 0),
+            collectionCount: rows.reduce((sum, row) => sum + (row.endpointsCount ?? row.hostNames?.length ?? 0), 0),
         });
     }, [selectedTab, data.users, data.devices]);
 
