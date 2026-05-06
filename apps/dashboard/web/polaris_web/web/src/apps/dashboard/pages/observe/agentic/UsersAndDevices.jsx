@@ -55,17 +55,20 @@ function UsersAndDevices() {
         setSelected(selectedIndex);
     };
 
-    const headers = useMemo(
-        () =>
-            getHeaders({
-                primaryColumnTitle: selectedTab === "users" ? "User" : "Device",
-                primaryColumnText: selectedTab === "users" ? "User" : "Device",
-                includeIconColumn: false,
-                includeUserColumns: selectedTab === "users",
-                ...usersAndDevicesCountColumnOpts,
-            }),
-        [selectedTab],
-    );
+    const headers = useMemo(() => {
+        const h = getHeaders({
+            primaryColumnTitle: selectedTab === "users" ? "User" : "Device",
+            primaryColumnText: selectedTab === "users" ? "User" : "Device",
+            includeIconColumn: false,
+            includeUserColumns: selectedTab === "users",
+            ...usersAndDevicesCountColumnOpts,
+        });
+        // For devices tab only: show stripped display name in column and filter
+        if (selectedTab === "devices") {
+            h[0] = { ...h[0], value: "groupNameDisplay", textValue: "groupNameDisplay", filterKey: "groupNameDisplay" };
+        }
+        return h;
+    }, [selectedTab]);
 
     const sortOptionsNoIcon = useMemo(
         () => getSortOptionsWithoutIconColumn(usersAndDevicesCountColumnOpts),

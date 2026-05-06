@@ -76,9 +76,9 @@ const headers = [
         {
             title: "Endpoint ID",
             text: "Endpoint ID",
-            value: "endpointId",
-            filterKey: "endpointId",
-            textValue: 'endpointId',
+            value: "endpointIdDisplay",
+            filterKey: "endpointIdDisplay",
+            textValue: 'endpointIdDisplay',
             showFilter: true,
             isText: CellType.TEXT,
             boxWidth: '100px'
@@ -294,6 +294,11 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
         if (isEndpointSecurityCategory()) {
             displayText = splitResult.apiCollectionName;
         }
+        // Strip hash suffix (e.g. --be4f9b91) from display only for Atlas/Argus categories
+        // endpointId is kept raw (with hash) for grouping/filtering logic
+        if (isAtlasArgus) {
+            displayText = displayText.replace(/--[0-9a-f]{8}(?=\.|$)/i, '');
+        }
 
         // Build result object directly without spread operator for better memory efficiency
         return {
@@ -301,6 +306,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             displayName: c.displayName,
             splitApiCollectionName: displayText,
             endpointId: endpointId,
+            endpointIdDisplay: isAtlasArgus ? endpointId.replace(/--[0-9a-f]{8}(?=\.|$)/i, '') : endpointId,
             sourceId: sourceId,
             serviceName: serviceName,
             hostName: c.hostName,
@@ -403,6 +409,11 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
     if (isEndpointSecurityCategory()) {
         splitApiCollectionName = splitResult.apiCollectionName;
     }
+    // Strip hash suffix (e.g. --be4f9b91) from display only for Atlas/Argus categories
+    // endpointId is kept raw (with hash) for grouping/filtering logic
+    if (isAtlasArgus) {
+        splitApiCollectionName = splitApiCollectionName.replace(/--[0-9a-f]{8}(?=\.|$)/i, '');
+    }
 
     // Return minimal object - only fields needed for filtering, sorting, and categorization
     // JSX components will be created on-demand by prettifyPageData
@@ -411,6 +422,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         displayName: rawCollection.displayName,
         splitApiCollectionName: splitApiCollectionName,
         endpointId: endpointId,
+        endpointIdDisplay: isAtlasArgus ? endpointId.replace(/--[0-9a-f]{8}(?=\.|$)/i, '') : endpointId,
         sourceId: sourceId,
         serviceName: serviceName,
         hostName: rawCollection.hostName,

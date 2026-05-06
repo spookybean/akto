@@ -875,6 +875,11 @@ export default {
           }
           return result;
         }
-      }
+    },
+    
+    stripDeviceIdSuffix(str) {
+        if (!str) return str;
+        return str.replace(/--[0-9a-fA-F]{8}(?=\.|$)/g, '');
+    }
 
 }
