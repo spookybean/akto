@@ -190,6 +190,9 @@ function Endpoints() {
         } else {
             delete updatedFiltersMap[INVENTORY_FILTER_KEY];
         }
+        // The agent-tree subview keeps its own filter slot; clear it so the
+        // previous row's hostnames don't leak into this row's view.
+        delete updatedFiltersMap[`${INVENTORY_FILTER_KEY}agent-tree/`];
 
         setFiltersMap(updatedFiltersMap);
         
