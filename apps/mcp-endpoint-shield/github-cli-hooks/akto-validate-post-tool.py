@@ -30,17 +30,28 @@ SSL_CERT_PATH = os.getenv("SSL_CERT_PATH")
 SSL_VERIFY = os.getenv("SSL_VERIFY", "true").lower() == "true"
 
 
-def parse_github_tool(tool_name: str) -> Tuple[bool, str, str]:
-    """GitHub Copilot CLI / VS Code MCP tool naming is `mcp_<server>_<tool>`."""
-    if not tool_name.startswith("mcp_"):
-        return False, "", ""
-    rest = tool_name[len("mcp_"):]
-    if "_" not in rest:
-        return False, "", ""
-    server, _, mcp_tool = rest.partition("_")
-    if not server or not mcp_tool:
-        return False, "", ""
-    return True, server, mcp_tool
+def parse_github_tool(tool_name: str, logger: logging.Logger) -> Tuple[bool, str, str]:
+    """Detect MCP tool names. Two conventions are supported:
+      - Legacy VS Code form: `mcp_<server>_<tool>` — split on first underscore after the prefix.
+      - Copilot CLI form: `<server>-<tool>` — split on the LAST hyphen; everything before
+        is the server name, everything after is the tool name. Native CLI tool names
+        (e.g. `bash`, `report_intent`) contain no hyphen and are treated as non-MCP.
+    Returns (is_mcp, server, mcp_tool)."""
+    if tool_name.startswith("mcp_"):
+        rest = tool_name[len("mcp_"):]
+        server, _, mcp_tool = rest.partition("_")
+        if server and mcp_tool:
+            logger.info(f"Detected MCP tool (underscore form). server={server}, mcp_tool={mcp_tool}")
+            return True, server, mcp_tool
+
+    if "-" in tool_name:
+        server, _, mcp_tool = tool_name.rpartition("-")
+        if server and mcp_tool:
+            logger.info(f"Detected MCP tool (hyphen form). server={server}, mcp_tool={mcp_tool}")
+            return True, server, mcp_tool
+
+    logger.info(f"Not an MCP tool name: {tool_name}")
+    return False, "", ""
 
 
 def _tool_arguments_for_jsonrpc(tool_input: Any) -> Dict[str, Any]:
@@ -78,7 +89,7 @@ def detect_connector(input_data: dict) -> str:
     """Detect connector from hook payload. hookEventName is present in all VSCode payloads."""
     if "hookEventName" in input_data:
         return "vscode"
-    return os.getenv("AKTO_CONNECTOR", "vscode")
+    return os.getenv("AKTO_CONNECTOR", "copilot_cli")
 
 
 def get_connector_config(connector: str) -> dict:
@@ -92,7 +103,7 @@ def get_connector_config(connector: str) -> dict:
             "ai_agent_tag": "vscode",
             "hook_header": "x-vscode-hook",
             "atlas_domain": "ai-agent.vscode",
-            "log_dir_default": "~/akto/.github/akto/copilot/logs",
+            "log_dir_default": "~/.github/akto/vscode/logs",
         }
     else:
         api_url = os.getenv("GITHUB_COPILOT_API_URL", "https://api.github.com")
@@ -103,7 +114,7 @@ def get_connector_config(connector: str) -> dict:
             "ai_agent_tag": "copilotcli",
             "hook_header": "x-copilot-hook",
             "atlas_domain": "ai-agent.copilot",
-            "log_dir_default": "~/akto/.github/akto/copilot/logs",
+            "log_dir_default": "~/.github/akto/copilot/logs",
         }
 
 
@@ -140,7 +151,7 @@ def post_to_akto(url: str, payload: Dict[str, Any], logger) -> Union[Dict[str, A
     """Send JSON payload to Akto API."""
     logger.info(f"API CALL: POST {url}")
     if LOG_PAYLOADS:
-        logger.debug(f"Payload: {json.dumps(payload, default=str)[:1000]}...")
+        logger.info(f"Payload: {json.dumps(payload, default=str)[:2000]}")
 
     headers = {"Content-Type": "application/json"}
     if AKTO_TOKEN:
@@ -160,14 +171,14 @@ def post_to_akto(url: str, payload: Dict[str, Any], logger) -> Union[Dict[str, A
             raw = response.read().decode("utf-8")
             logger.info(f"Response: {response.getcode()} in {duration_ms}ms")
             if LOG_PAYLOADS:
-                logger.debug(f"Response body: {raw[:1000]}...")
+                logger.info(f"Response body: {raw[:2000]}")
             try:
                 return json.loads(raw)
             except json.JSONDecodeError:
                 return raw
     except Exception as e:
         duration_ms = int((time.time() - start_time) * 1000)
-        logger.error(f"API call failed after {duration_ms}ms: {e}")
+        logger.error(f"API call to {url} failed after {duration_ms}ms: {e}")
         raise
 
 
@@ -330,7 +341,7 @@ def call_guardrails(
         allowed = guardrails_result.get("Allowed", True)
         reason = guardrails_result.get("Reason", "")
         behaviour = guardrails_result.get("behaviour", "") or guardrails_result.get("Behaviour", "")
-        logger.debug(f"Guardrails result — allowed={allowed}, behaviour={behaviour!r}, reason={reason!r}")
+        logger.info(f"Guardrails result — allowed={allowed}, behaviour={behaviour!r}, reason={reason!r}")
 
         if allowed:
             logger.info(f"Tool result ALLOWED for {tool_name}")
@@ -525,36 +536,52 @@ def main():
     logger.info(f"=== Post-Tool Use Hook - Connector: {connector}, Mode: {MODE}, Sync: {AKTO_SYNC_MODE} ===")
 
     if LOG_PAYLOADS:
-        logger.debug(f"Input: {json.dumps(input_data)}")
+        logger.info(f"Raw input (truncated): {json.dumps(input_data, default=str)[:2000]}")
 
     logger.info(f"MODE: {MODE}, API_URL: {cfg['api_url']}")
 
-    # Parse input — key names and result format differ between connectors
+    # Parse input — key names and result format differ between connectors.
+    # toolArgs/tool_input may arrive as a JSON string OR a dict (Copilot CLI is inconsistent
+    # between preToolUse and postToolUse). Normalise to a JSON string here.
     if cfg["is_vscode"]:
         tool_name = input_data.get("tool_name", "unknown")
-        tool_input = input_data.get("tool_input", {})
-        tool_args = json.dumps(tool_input) if isinstance(tool_input, dict) else str(tool_input)
+        raw_args = input_data.get("tool_input", {})
         tool_response = input_data.get("tool_response", "")
-        result_text = tool_response if isinstance(tool_response, str) else str(tool_response)
+        result_text = tool_response if isinstance(tool_response, str) else json.dumps(tool_response)
         result_type = "unknown"
         status_code = "200"
     else:
         tool_name = input_data.get("toolName") or input_data.get("tool_name", "unknown")
-        tool_args = input_data.get("toolArgs") or json.dumps(input_data.get("tool_input", {}))
+        raw_args = input_data.get("toolArgs")
+        if raw_args is None:
+            raw_args = input_data.get("tool_input", {})
         tool_result = input_data.get("toolResult", {})
         result_text = tool_result.get("textResultForLlm", "")
         result_type = tool_result.get("resultType", "unknown")
         status_code = {"failure": "500", "denied": "403"}.get(result_type, "200")
+    tool_args = raw_args if isinstance(raw_args, str) else json.dumps(raw_args)
 
-    is_mcp, mcp_server_name, mcp_tool_name = parse_github_tool(tool_name)
+    is_mcp, mcp_server_name, mcp_tool_name = parse_github_tool(tool_name, logger)
+
+    logger.info(
+        f"Parsed: tool_name={tool_name!r}, tool_args_len={len(tool_args)}, "
+        f"result_type={result_type!r}, status_code={status_code}, result_len={len(result_text)}"
+    )
+    if LOG_PAYLOADS:
+        logger.info(f"tool_args (truncated): {tool_args[:1000]}")
+        logger.info(f"result_text (truncated): {result_text[:1000]}")
+    if tool_name == "unknown":
+        logger.warning(
+            f"tool_name fell back to 'unknown'. connector={connector}. "
+            f"Available top-level keys={sorted(input_data.keys())}. "
+            f"Expected 'toolName' (Copilot CLI) or 'tool_name' (VSCode)."
+        )
+
     if is_mcp:
         logger.info(f"Tool: {tool_name} (MCP server={mcp_server_name}, mcpTool={mcp_tool_name})")
     else:
         logger.info(f"Tool: {tool_name}")
-    if LOG_PAYLOADS:
-        logger.debug(f"Tool args: {tool_args}")
-        logger.debug(f"Result: {result_text[:500]}")
-    else:
+    if not LOG_PAYLOADS:
         logger.info(f"Result preview ({len(result_text)} chars): {result_text[:100]}...")
 
     if not result_text:
@@ -633,4 +660,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception:
+        logging.getLogger(__name__).exception("Post-tool hook crashed with uncaught exception")
+        sys.exit(0)
