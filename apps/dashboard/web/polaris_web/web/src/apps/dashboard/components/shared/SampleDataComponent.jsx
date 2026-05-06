@@ -102,7 +102,9 @@ function SampleDataComponent(props) {
         const effectiveMetadata = metadata ?? sampleData?.metadata;
         const { segments: metadataSegments, fromMetadata } = selectMetadataSegments(effectiveMetadata);
         const baseSegments = sampleData?.vulnerabilitySegments || [];
-        const vulnerabilitySegments = metadataSegments.length > 0 ? metadataSegments : baseSegments;
+        const allSegments = metadataSegments.length > 0 ? metadataSegments : baseSegments;
+        const vulnerabilitySegments = allSegments.filter(s => s.location !== 'LOCATION_RESPONSE_BODY');
+        const responseVulnerabilitySegments = allSegments.filter(s => s.location === 'LOCATION_RESPONSE_BODY');
         const segmentsFromMetadata = fromMetadata;
 
         if(isNewDiff){
@@ -120,13 +122,13 @@ function SampleDataComponent(props) {
 
             setSampleJsonData({
                 request: requestData,
-                response: { ...responseData, vulnerabilitySegments }
+                response: { ...responseData, vulnerabilitySegments: responseVulnerabilitySegments }
             })
         }else{
             setSampleJsonData({ 
                 // If segments came from threat metadata, highlight in request; if they were provided by caller (e.g., LLM analysis), pass to both panes
                 request: { message: transform.formatData(requestJson,"http", redactHeaders), original: transform.formatData(originalRequestJson,"http", redactHeaders), highlightPaths:requestJson?.highlightPaths, vulnerabilitySegments },
-                response: showResponse ? { message: transform.formatData(responseJson,"http", redactHeaders), original: transform.formatData(originalResponseJson,"http", redactHeaders), highlightPaths:responseJson?.highlightPaths, ...(segmentsFromMetadata ? {} : {vulnerabilitySegments}) } : {},
+                response: showResponse ? { message: transform.formatData(responseJson,"http", redactHeaders), original: transform.formatData(originalResponseJson,"http", redactHeaders), highlightPaths:responseJson?.highlightPaths, vulnerabilitySegments: segmentsFromMetadata ? responseVulnerabilitySegments : vulnerabilitySegments } : {},
             })
         }
     }, [sampleData, metadata, isNewDiff, showResponse, simpleJson, type, redactHeaders])
