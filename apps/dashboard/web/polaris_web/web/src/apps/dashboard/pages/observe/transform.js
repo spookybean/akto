@@ -602,7 +602,6 @@ const transform = {
                 displayName: c.displayName,
                 splitApiCollectionName: splitApiCollectionName,
                 endpointId: endpointId,
-                endpointIdDisplay: endpointId ? func.stripDeviceIdSuffix(endpointId) : (c.endpointIdDisplay || ''),
                 sourceId: sourceId || c.sourceId,
                 serviceName: serviceName || c.serviceName,
                 displayNameComp: displayNameComp,

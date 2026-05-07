@@ -76,9 +76,9 @@ const headers = [
         {
             title: "Endpoint ID",
             text: "Endpoint ID",
-            value: "endpointIdDisplay",
-            filterKey: "endpointIdDisplay",
-            textValue: 'endpointIdDisplay',
+            value: "endpointId",
+            filterKey: "endpointId",
+            textValue: 'endpointId',
             showFilter: true,
             isText: CellType.TEXT,
             boxWidth: '100px'
@@ -294,9 +294,6 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
         if (isEndpointSecurityCategory()) {
             displayText = splitResult.apiCollectionName;
         }
-        if (isAtlasArgus) {
-            displayText = func.stripDeviceIdSuffix(displayText);
-        }
 
         // Build result object directly without spread operator for better memory efficiency
         return {
@@ -304,7 +301,6 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             displayName: c.displayName,
             splitApiCollectionName: displayText,
             endpointId: endpointId,
-            endpointIdDisplay: isAtlasArgus ? func.stripDeviceIdSuffix(endpointId) : endpointId,
             sourceId: sourceId,
             serviceName: serviceName,
             hostName: c.hostName,
@@ -407,9 +403,6 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
     if (isEndpointSecurityCategory()) {
         splitApiCollectionName = splitResult.apiCollectionName;
     }
-    if (isAtlasArgus) {
-        splitApiCollectionName = func.stripDeviceIdSuffix(splitApiCollectionName);
-    }
 
     // Return minimal object - only fields needed for filtering, sorting, and categorization
     // JSX components will be created on-demand by prettifyPageData
@@ -418,7 +411,6 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         displayName: rawCollection.displayName,
         splitApiCollectionName: splitApiCollectionName,
         endpointId: endpointId,
-        endpointIdDisplay: isAtlasArgus ? func.stripDeviceIdSuffix(endpointId) : endpointId,
         sourceId: sourceId,
         serviceName: serviceName,
         hostName: rawCollection.hostName,
