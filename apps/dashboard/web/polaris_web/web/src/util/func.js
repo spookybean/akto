@@ -102,12 +102,9 @@ const agenticCategoryMapping = {
   "ROGUE_AGENTS": ASI10,
 }
 
-const stripDeviceIdSuffix = (str) => str ? str.replace(/--[0-9a-f]{8}(?=\.|$)/i, '') : str;
-
 const func = {
   categoryMapping: categoryMapping,
   agenticCategoryMapping: agenticCategoryMapping,
-  stripDeviceIdSuffix,
   setToast (isActive, isError, message) {
     Store.getState().setToastConfig({
           isActive: isActive,
@@ -2549,7 +2546,12 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
         mcpSecurityGranted,
         stiggFeatures
       }
-    }
+    },
+
+  stripDeviceIdSuffix(str) {
+    if (!str) return str;
+    return str.replace(/--[0-9a-f]{8}(?=\.|$)/i, '');
+  }
 }
 
 export default func
