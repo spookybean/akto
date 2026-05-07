@@ -9,6 +9,7 @@ import com.akto.log.LoggerMaker.LogDb;
 import com.akto.util.Constants;
 import com.akto.util.Util;
 import com.akto.util.enums.GlobalEnums.CONTEXT_SOURCE;
+import com.akto.util.enums.GlobalEnums.GuardrailSource;
 import com.akto.util.http_util.CoreHTTPClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.BasicDBObject;
@@ -24,6 +25,7 @@ import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
 import okhttp3.ResponseBody;
+import org.apache.commons.lang3.StringUtils;
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
 
@@ -87,10 +89,34 @@ public class GuardrailPoliciesAction extends UserAction {
             User user = getSUser();
             int currentTime = Context.now();
 
-            // Get current context source for this guardrail, default to ENDPOINT if not set
+            boolean isGithubWorkflow = policy.getSource() == GuardrailSource.GITHUB_WORKFLOW
+                    && StringUtils.isNotBlank(policy.getSourceHash());
+
             CONTEXT_SOURCE contextSource = Context.contextSource.get();
             if (contextSource == null) {
                 contextSource = CONTEXT_SOURCE.AGENTIC;
+            }
+            String createdByValue = user.getLogin();
+
+            if (isGithubWorkflow) {
+                GuardrailPolicies existing = GuardrailPoliciesDao.instance.findOne(
+                    Filters.and(
+                        Filters.eq("name", policy.getName()),
+                        Filters.eq("contextSource", contextSource)
+                    )
+                );
+                if (existing != null && policy.getSourceHash().equals(existing.getSourceHash())) {
+                    loggerMaker.infoAndAddToDb("GITHUB_WORKFLOW: sourceHash unchanged, skipping update for: " + policy.getName());
+                    return SUCCESS.toUpperCase();
+                }
+                if (existing != null) {
+                    hexId = existing.getId().toHexString();
+                    loggerMaker.infoAndAddToDb("GITHUB_WORKFLOW: sourceHash changed, updating policy: " + policy.getName());
+                } else {
+                    hexId = null;
+                    loggerMaker.infoAndAddToDb("GITHUB_WORKFLOW: no existing policy, inserting: " + policy.getName());
+                }
+                createdByValue = GuardrailSource.GITHUB_WORKFLOW.getDisplayName();
             }
 
             loggerMaker.info("createGuardrailPolicy called with hexId: " + hexId);
@@ -155,14 +181,26 @@ public class GuardrailPoliciesAction extends UserAction {
             // Set contextSource from current context
             updates.add(Updates.set("contextSource", contextSource));
 
+            // Persist source and sourceHash if provided
+            if (policy.getSource() != null) {
+                updates.add(Updates.set("source", policy.getSource()));
+            }
+            if (StringUtils.isNotBlank(policy.getSourceHash())) {
+                updates.add(Updates.set("sourceHash", policy.getSourceHash()));
+            }
+
             // Only set createdBy and createdTimestamp on insert
-            updates.add(Updates.setOnInsert("createdBy", user.getLogin()));
+            updates.add(Updates.setOnInsert("createdBy", createdByValue));
             updates.add(Updates.setOnInsert("createdTimestamp", currentTime));
             updates.add(Updates.set("updatedTimestamp", currentTime));
 
             // Only set updatedTimestamp and updatedBy on actual updates (when hexId exists)
             if (hexId != null && !hexId.isEmpty()) {
-                updates.add(Updates.set("updatedBy", user.getLogin()));
+                String updatedByValue = user.getLogin();
+                if (isGithubWorkflow) {
+                    updatedByValue = GuardrailSource.GITHUB_WORKFLOW.getDisplayName();
+                }
+                updates.add(Updates.set("updatedBy", updatedByValue));
             }
 
             // Perform upsert using updateOne with upsert option
