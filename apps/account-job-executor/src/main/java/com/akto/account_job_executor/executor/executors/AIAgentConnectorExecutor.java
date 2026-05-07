@@ -420,7 +420,7 @@ public class AIAgentConnectorExecutor extends AccountJobExecutor {
         if (!result.isSuccess()) {
             String outputTail = tailOfOutput(result.getStdout(), MAX_BINARY_ERROR_OUTPUT_CHARS);
             String errorMsg = "Binary execution failed with exit code " + result.getExitCode() +
-                ". Output (tail): " + outputTail;
+                ". Output: " + outputTail;
             logger.error("Binary execution failed: {}", errorMsg);
             throw new Exception(errorMsg);
         }
