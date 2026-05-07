@@ -404,10 +404,9 @@ const finalizeHostGroupedRow = (g, idSegment) => {
     return {
         rowType: g.rowType,
         groupName: g.groupName,
-        groupNameDisplay: g.groupNameDisplay ?? g.groupName,
         groupKey: g.groupKey,
         hostNames: g.hostNames,
-        inventoryScopeLabel: g.groupNameDisplay ?? g.groupName,
+        inventoryScopeLabel: g.groupName,
         collections: g.collections,
         firstCollection: g.firstCollection,
         id: `${ROW_ID_PREFIX.SERVICE}-${idSegment}-${String(g.groupKey).replace(/[^a-zA-Z0-9_.-]/g, "_")}`,
@@ -438,7 +437,6 @@ export const groupCollectionsByDevice = (collections, trafficMap = {}, sensitive
             devices[deviceId] = {
                 rowType: ROW_TYPES.SERVICE,
                 groupName: deviceId,
-                groupNameDisplay: func.stripAgentHashSuffix(deviceId),
                 groupKey: deviceId,
                 hostNames: [],
                 clientTypes: new Set(),
