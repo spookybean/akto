@@ -256,7 +256,8 @@ function ApiEndpoints(props) {
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setAllCollections = PersistStore(state => state.setAllCollections)
 
-    const [ pageTitle, setPageTitle] = useState(collectionsMap[apiCollectionId] !== undefined ? collectionsMap[apiCollectionId] : "")
+    const stripCollectionHashSuffix = (name) => (isAgenticSecurityCategory() || isEndpointSecurityCategory()) ? func.stripDeviceIdSuffix(name || '') : (name || '');
+    const [ pageTitle, setPageTitle] = useState(stripCollectionHashSuffix(collectionsMap[apiCollectionId] !== undefined ? collectionsMap[apiCollectionId] : ""))
     const [apiEndpoints, setApiEndpoints] = useState([])
     const [apiInfoList, setApiInfoList] = useState([])
     const [unusedEndpoints, setUnusedEndpoints] = useState([])
@@ -790,8 +791,8 @@ function ApiEndpoints(props) {
     }, [apiCollectionId, endpointListFromConditions])
 
     useEffect(() => {
-        if (pageTitle !== collectionsMap[apiCollectionId]) { 
-            setPageTitle(collectionsMap[apiCollectionId])
+        if (pageTitle !== stripCollectionHashSuffix(collectionsMap[apiCollectionId])) {
+            setPageTitle(stripCollectionHashSuffix(collectionsMap[apiCollectionId]))
         }
 
         setDescription(collectionsObj?.description || "")

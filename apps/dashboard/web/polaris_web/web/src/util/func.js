@@ -2546,7 +2546,12 @@ showConfirmationModal(modalContent, primaryActionContent, primaryAction) {
         mcpSecurityGranted,
         stiggFeatures
       }
-    }
+    },
+
+  stripDeviceIdSuffix(str) {
+    if (!str) return str;
+    return str.replace(/--[0-9a-f]{8}(?=\.|$)/i, '');
+  }
 }
 
 export default func

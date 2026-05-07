@@ -27,8 +27,8 @@ const parentHeadersBase = [
         title: "Endpoint ID",
         text: "Endpoint ID",
         value: "displayNameComp",
-        filterKey: "endpointId",
-        textValue: 'endpointId',
+        filterKey: "endpointIdDisplay",
+        textValue: 'endpointIdDisplay',
         showFilter: true,
     },
     {
@@ -176,6 +176,7 @@ const groupByEndpointId = (collections) => {
         if (!groups[endpointId]) {
             groups[endpointId] = {
                 endpointId,
+                endpointIdDisplay: collection.endpointIdDisplay || endpointId,
                 children: [],
                 riskScore: 0,
                 sensitiveInRespTypes: [],
@@ -255,11 +256,11 @@ const prettifyGroupedData = (groupedData, filterType, showCategoryColumn, expand
             id: group.apiCollectionIds[0] || `endpoint-${group.endpointId}`,
             allIds: group.apiCollectionIds, // Keep array for bulk actions
             name: `endpoint-${group.endpointId}`,
-            displayName: group.endpointId,
+            displayName: group.endpointIdDisplay || group.endpointId,
             displayNameComp: (
                 <HorizontalStack gap="1" align="start" wrap={false}>
                     <Box maxWidth="200px">
-                        <TooltipText tooltip={group.endpointId} text={group.endpointId} textProps={{variant: 'headingSm'}} />
+                        <TooltipText tooltip={group.endpointIdDisplay || group.endpointId} text={group.endpointIdDisplay || group.endpointId} textProps={{variant: 'headingSm'}} />
                     </Box>
                     <Badge size="small" status="new">{childCount}</Badge>
                     {group.hasPersonalAccount && <Badge size="small" status="warning">Contains personal account</Badge>}

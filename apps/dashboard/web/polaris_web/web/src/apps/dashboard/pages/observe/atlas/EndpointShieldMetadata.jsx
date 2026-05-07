@@ -103,7 +103,7 @@ function EndpointShieldMetadata() {
             setAllowedEnvFields(response.allowedEnvFields || []);
             const agents = endpointShieldModules.map(module => ({
                 agentId: module.id,
-                hostname: module.name,
+                hostname: func.stripDeviceIdSuffix(module.name),
                 deviceId: module.additionalData?.deviceId || DEFAULT_VALUE,
                 agentVersion: module.currentVersion || DEFAULT_VALUE,
                 username: module.additionalData?.username || DEFAULT_VALUE,
