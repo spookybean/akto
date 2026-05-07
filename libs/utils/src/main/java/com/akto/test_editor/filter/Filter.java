@@ -1,10 +1,14 @@
 package com.akto.test_editor.filter;
 
 import com.akto.gpt.handlers.gpt_prompts.TestValidatorModifier;
+import com.akto.jsonrpc.McpToolDescriptionsRegistry;
+
 import java.util.*;
 
 import com.akto.log.LoggerMaker;
 import com.akto.log.LoggerMaker.LogDb;
+import com.akto.mcp.McpJsonRpcModel;
+import com.akto.mcp.McpRequestResponseUtils;
 import com.akto.billing.UsageMetricUtils;
 import com.akto.dao.context.Context;
 import com.akto.dao.test_editor.TestEditorEnums;
@@ -21,6 +25,7 @@ import com.akto.gpt.handlers.gpt_prompts.TestExecutorModifier;
 import com.akto.gpt.handlers.gpt_prompts.TestFilterModifier;
 import com.akto.test_editor.Utils;
 import com.akto.test_editor.filter.data_operands_impl.ValidationResult;
+import com.akto.util.JSONUtils;
 import com.mongodb.BasicDBObject;
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONArray;
@@ -49,7 +54,53 @@ public class Filter {
         try {
             int accountId = Context.accountId.get();
             FeatureAccess featureAccess = UsageMetricUtils.getFeatureAccessSaas(accountId, TestExecutorModifier._AKTO_GPT_AI);
+            // FeatureAccess featureAccess = FeatureAccess.fullAccess;
             if (featureAccess.getIsGranted()) {
+
+                // MCP request: always fire a single query enriched with tool context
+                RawApi rawApiForMcp = filterActionRequest.fetchRawApiBasedOnContext();
+                if (McpRequestResponseUtils.isMcpRequest(rawApiForMcp)) {
+                    McpJsonRpcModel mcpModel = JSONUtils.fromJson(rawApiForMcp.getRequest().getBody(), McpJsonRpcModel.class);
+                    if (mcpModel != null && mcpModel.getParams() != null) {
+                        String toolName = mcpModel.getParams().getName();
+                        if (toolName != null && !toolName.isEmpty()) {
+                            String toolDescription = McpToolDescriptionsRegistry.get(toolName);
+                            if (toolDescription != null && !toolDescription.isEmpty()) {
+                                String ogRequest = Utils.buildRequestIHttpFormat(rawApiForMcp);
+                                String response = Utils.buildResponseIHttpFormat(rawApiForMcp);
+                                String toolContext = "Tool: " + toolName + "\nDescription: " + toolDescription;
+                                BasicDBObject queryData = new BasicDBObject();
+                                queryData.put(TestExecutorModifier._REQUEST, "Request payload: \n" + ogRequest + "\n\nResponse payload: \n" + response);
+                                queryData.put(TestExecutorModifier._TOOL_CONTEXT, toolContext);
+                                queryData.put(TestExecutorModifier._OPERATION, operationTypeLower + ": " + querySet);
+                                BasicDBObject generatedData = filterActionRequest.isValidationContext()
+                                    ? new TestValidatorModifier().handle(queryData)
+                                    : new TestFilterModifier().handle(queryData);
+                                loggerMaker.infoAndAddToDb("JARVIS_LLM_RESPONSE (MCP): " + generatedData);
+                                if (generatedData.containsKey(operationTypeLower)) {
+                                    Object generatedQuerySet = generatedData.get(operationTypeLower);
+                                    if (generatedQuerySet instanceof JSONArray) {
+                                        JSONArray arr = (JSONArray) generatedQuerySet;
+                                        List<Object> list = new ArrayList<>();
+                                        for (int i = 0; i < arr.length(); i++) {
+                                            list.add(arr.get(i));
+                                        }
+                                        newQuerySet = list;
+                                    } else {
+                                        newQuerySet = generatedQuerySet;
+                                    }
+                                    querySetUpdated = true;
+                                }
+                                if (!querySetUpdated) {
+                                    newQuerySet = INVALID_QS_;
+                                }
+                                return newQuerySet;
+                            }
+                        }
+                    }
+                }
+
+
                 if (querySet instanceof String) {
                     String query = (String) querySet;
                     if (query.startsWith(Utils._MAGIC)) {
