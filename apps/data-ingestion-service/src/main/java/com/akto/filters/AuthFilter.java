@@ -20,7 +20,7 @@ import java.util.Base64;
 
 public class AuthFilter implements Filter {
 
-    private static final LoggerMaker logger = new LoggerMaker(AuthFilter.class);
+    private static final LoggerMaker logger = new LoggerMaker(AuthFilter.class, LoggerMaker.LogDb.DATA_INGESTION);
 
     @Override
     public void init(FilterConfig filterConfig) throws ServletException {
