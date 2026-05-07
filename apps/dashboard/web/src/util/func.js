@@ -877,9 +877,9 @@ export default {
         }
     },
     
-    stripDeviceIdSuffix(str) {
+    stripAgentHashSuffix(str) {
         if (!str) return str;
-        return str.replace(/--[0-9a-fA-F]{8}(?=\.|$)/g, '');
+        return str.replace(/--[0-9a-f]{8}(?=\.|$)/i, '');
     }
 
 }

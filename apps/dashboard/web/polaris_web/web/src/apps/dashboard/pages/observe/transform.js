@@ -602,7 +602,7 @@ const transform = {
                 displayName: c.displayName,
                 splitApiCollectionName: splitApiCollectionName,
                 endpointId: endpointId,
-                endpointIdDisplay: endpointId ? endpointId.replace(/--[0-9a-f]{8}(?=\.|$)/i, '') : (c.endpointIdDisplay || ''),
+                endpointIdDisplay: endpointId ? func.stripAgentHashSuffix(endpointId) : (c.endpointIdDisplay || ''),
                 sourceId: sourceId || c.sourceId,
                 serviceName: serviceName || c.serviceName,
                 displayNameComp: displayNameComp,

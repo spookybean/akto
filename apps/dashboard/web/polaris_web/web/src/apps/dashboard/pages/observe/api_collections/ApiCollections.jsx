@@ -297,7 +297,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
         // Strip hash suffix (e.g. --be4f9b91) from display only for Atlas/Argus categories
         // endpointId is kept raw (with hash) for grouping/filtering logic
         if (isAtlasArgus) {
-            displayText = displayText.replace(/--[0-9a-f]{8}(?=\.|$)/i, '');
+            displayText = func.stripAgentHashSuffix(displayText);
         }
 
         // Build result object directly without spread operator for better memory efficiency
@@ -306,7 +306,7 @@ const convertToNewData = (collectionsArr, sensitiveInfoMap, severityInfoMap, cov
             displayName: c.displayName,
             splitApiCollectionName: displayText,
             endpointId: endpointId,
-            endpointIdDisplay: isAtlasArgus ? endpointId.replace(/--[0-9a-f]{8}(?=\.|$)/i, '') : endpointId,
+            endpointIdDisplay: isAtlasArgus ? func.stripAgentHashSuffix(endpointId) : endpointId,
             sourceId: sourceId,
             serviceName: serviceName,
             hostName: c.hostName,
@@ -412,7 +412,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
     // Strip hash suffix (e.g. --be4f9b91) from display only for Atlas/Argus categories
     // endpointId is kept raw (with hash) for grouping/filtering logic
     if (isAtlasArgus) {
-        splitApiCollectionName = splitApiCollectionName.replace(/--[0-9a-f]{8}(?=\.|$)/i, '');
+        splitApiCollectionName = func.stripAgentHashSuffix(splitApiCollectionName);
     }
 
     // Return minimal object - only fields needed for filtering, sorting, and categorization
@@ -422,7 +422,7 @@ const transformRawCollectionData = (rawCollection, transformMaps) => {
         displayName: rawCollection.displayName,
         splitApiCollectionName: splitApiCollectionName,
         endpointId: endpointId,
-        endpointIdDisplay: isAtlasArgus ? endpointId.replace(/--[0-9a-f]{8}(?=\.|$)/i, '') : endpointId,
+        endpointIdDisplay: isAtlasArgus ? func.stripAgentHashSuffix(endpointId) : endpointId,
         sourceId: sourceId,
         serviceName: serviceName,
         hostName: rawCollection.hostName,

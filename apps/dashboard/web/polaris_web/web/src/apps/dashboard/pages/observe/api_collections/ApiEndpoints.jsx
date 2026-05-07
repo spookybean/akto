@@ -256,7 +256,7 @@ function ApiEndpoints(props) {
     const setCollectionsMap = PersistStore(state => state.setCollectionsMap)
     const setAllCollections = PersistStore(state => state.setAllCollections)
 
-    const stripCollectionHashSuffix = (name) => (isAgenticSecurityCategory() || isEndpointSecurityCategory()) ? (name || '').replace(/--[0-9a-f]{8}(?=\.|$)/i, '') : (name || '');
+    const stripCollectionHashSuffix = (name) => (isAgenticSecurityCategory() || isEndpointSecurityCategory()) ? func.stripAgentHashSuffix(name || '') : (name || '');
     const [ pageTitle, setPageTitle] = useState(stripCollectionHashSuffix(collectionsMap[apiCollectionId] !== undefined ? collectionsMap[apiCollectionId] : ""))
     const [apiEndpoints, setApiEndpoints] = useState([])
     const [apiInfoList, setApiInfoList] = useState([])

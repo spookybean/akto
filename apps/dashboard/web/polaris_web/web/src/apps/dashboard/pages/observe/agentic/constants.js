@@ -438,7 +438,7 @@ export const groupCollectionsByDevice = (collections, trafficMap = {}, sensitive
             devices[deviceId] = {
                 rowType: ROW_TYPES.SERVICE,
                 groupName: deviceId,
-                groupNameDisplay: deviceId.replace(/--[0-9a-f]{8}(?=\.|$)/i, ''),
+                groupNameDisplay: func.stripAgentHashSuffix(deviceId),
                 groupKey: deviceId,
                 hostNames: [],
                 clientTypes: new Set(),
