@@ -491,7 +491,10 @@ export const groupCollectionsByUser = (collections, trafficMap = {}, sensitiveMa
         if (category !== CLIENT_TYPES.SKILL) {
             g.nonSkillCollectionsCount += 1;
         }
-        if (Array.isArray(c.skills)) {
+        // Skills bundled inside an AI Agent / MCP Server collection still make the user a Skill
+        // owner for the Type column, even when the user has no standalone Skill-type collection.
+        if (Array.isArray(c.skills) && c.skills.length > 0) {
+            g.clientTypes.add(CLIENT_TYPES.SKILL);
             c.skills.forEach(s => { if (s) g.uniqueSkillNames.add(String(s).toLowerCase()); });
         }
         accumulateHostGroupedCollection(g, c, trafficMap, sensitiveMap, riskScoreMap);
