@@ -1,6 +1,7 @@
 package com.akto.gateway;
 
 import com.akto.dao.context.Context;
+import com.akto.data_actor.ClientActor;
 import com.akto.dto.IngestDataBatch;
 import com.akto.log.LoggerMaker;
 
@@ -52,8 +53,8 @@ public class Gateway {
             boolean runRequestGuardrails = "true".equalsIgnoreCase(getStringField(requestData, "guardrails"));
             boolean runResponseGuardrails = "true".equalsIgnoreCase(getStringField(requestData, "response_guardrails"));
 
-            Integer accountId = Context.accountId.get();
-            if (accountId != null && (accountId == 1710118493 || accountId == 1000000)) {
+            if (shouldForceGuardrailsForAccount(Context.accountId.get())
+                || shouldForceGuardrailsForAccount(ClientActor.getAbstractorAccountIdFromEnvOrNull())) {
                 runRequestGuardrails = true;
                 runResponseGuardrails = true;
             }
@@ -97,6 +98,10 @@ public class Gateway {
             error.put("error", e.getMessage());
             return error;
         }
+    }
+
+    private static boolean shouldForceGuardrailsForAccount(Integer accountId) {
+        return accountId != null && (accountId == 1710118493 || accountId == 1000000);
     }
 
     private Map<String, Object> mergeGuardrailsResults(Map<String, Object> existing, Map<String, Object> incoming) {
