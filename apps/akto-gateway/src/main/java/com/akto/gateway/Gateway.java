@@ -52,7 +52,8 @@ public class Gateway {
             boolean runRequestGuardrails = "true".equalsIgnoreCase(getStringField(requestData, "guardrails"));
             boolean runResponseGuardrails = "true".equalsIgnoreCase(getStringField(requestData, "response_guardrails"));
 
-            if(Context.accountId.get() == 1710118493 || Context.accountId.get() == 1000000) {
+            Integer accountId = Context.accountId.get();
+            if (accountId != null && (accountId == 1710118493 || accountId == 1000000)) {
                 runRequestGuardrails = true;
                 runResponseGuardrails = true;
             }
