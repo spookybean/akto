@@ -215,7 +215,12 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
 
         String deviceName = getStringOrDefault(row, "DeviceName", "unknown-device");
         String processCommandLine = getStringOrDefault(row, "ProcessCommandLine", "");
-        String tool = detectTool(processCommandLine);
+        String fileName = getStringOrDefault(row, "FileName", "");
+        String folderPath = getStringOrDefault(row, "FolderPath", "");
+        String initiatingCmdLine = getStringOrDefault(row, "InitiatingProcessCommandLine", "");
+        String initiatingFileName = getStringOrDefault(row, "InitiatingProcessFileName", "");
+        String haystack = processCommandLine + " " + fileName + " " + folderPath + " " + initiatingCmdLine + " " + initiatingFileName;
+        String tool = detectTool(haystack);
         String host = deviceName + "." + tool + ".defender.microsoft.com";
 
         record.put("path", "/defender/process-events/" + tool + "/" + deviceName);
@@ -913,19 +918,23 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
 
     private String buildKqlQuery(String lastQueriedAt) {
         String toolFilter = buildProcessToolFilter();
-        String baseQuery = "DeviceProcessEvents" +
+        String matchClause =
             "| where ProcessCommandLine has_any (" + toolFilter + ")" +
-            "| project Timestamp, DeviceId, DeviceName, AccountName, AccountDomain, FileName, ProcessCommandLine, InitiatingProcessFileName" +
+            "    or FileName has_any (" + toolFilter + ")" +
+            "    or FolderPath has_any (" + toolFilter + ")" +
+            "    or InitiatingProcessCommandLine has_any (" + toolFilter + ")" +
+            "    or InitiatingProcessFileName has_any (" + toolFilter + ")";
+        String projectClause =
+            "| project Timestamp, DeviceId, DeviceName, AccountName, AccountDomain, FileName, FolderPath, ProcessCommandLine, InitiatingProcessFileName, InitiatingProcessCommandLine" +
             "| order by Timestamp desc";
 
         if (lastQueriedAt != null && !lastQueriedAt.isEmpty()) {
             return "DeviceProcessEvents" +
                 "| where Timestamp > datetime(" + lastQueriedAt + ")" +
-                "| where ProcessCommandLine has_any (" + toolFilter + ")" +
-                "| project Timestamp, DeviceId, DeviceName, AccountName, AccountDomain, FileName, ProcessCommandLine, InitiatingProcessFileName" +
-                "| order by Timestamp desc";
+                matchClause +
+                projectClause;
         }
-        return baseQuery;
+        return "DeviceProcessEvents" + matchClause + projectClause;
     }
 
     private static String buildProcessToolFilter() {
