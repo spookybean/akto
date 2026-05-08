@@ -589,6 +589,7 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
                     batch.put("is_pending", "false");
                     batch.put("source", "MIRRORING");
                     batch.put("tag", OBJECT_MAPPER.writeValueAsString(tagMap));
+                    batch.put("publishToGuardrails", true);
                     batchData.add(batch);
                 } catch (Exception e) {
                     logger.error("Failed to serialize skill discovery: {}", e.getMessage());
