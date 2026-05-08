@@ -525,8 +525,15 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
 
         Bson integrationUpdate = Updates.combine(
             Updates.set("updatedTs", Context.now()),
-            Updates.set("projectMappings", existingProjectMappings)
+            Updates.set("projectMappings", existingProjectMappings),
+            Updates.set("baseUrl", baseUrl),
+            Updates.set("userEmail", userEmail),
+            Updates.set("jiraType", jiraType)
         );
+
+        if (apiToken != null && !apiToken.contains("******")) {
+            integrationUpdate = Updates.combine(integrationUpdate, Updates.set("apiToken", apiToken));
+        }
 
         Map<String, List<BasicDBObject>> existingProjectIdMap = existingIntegration.getProjectIdsMap();
 
