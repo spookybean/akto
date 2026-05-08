@@ -106,12 +106,12 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
             logger.error("Defender process events phase failed for jobId={}: {}", job.getId(), e.getMessage());
         }
 
-        // Phase 3: MCP config + skills discovery via Live Response
-        try {
-            discoverMCPConfigsAndSkills(accessToken, normalizedUrl, job);
-        } catch (Exception e) {
-            logger.error("Defender MCP discovery phase failed for jobId={}: {}", job.getId(), e.getMessage());
-        }
+        // Phase 3: MCP config + skills discovery via Live Response (disabled)
+        // try {
+        //     discoverMCPConfigsAndSkills(accessToken, normalizedUrl, job);
+        // } catch (Exception e) {
+        //     logger.error("Defender MCP discovery phase failed for jobId={}: {}", job.getId(), e.getMessage());
+        // }
 
         Map<String, Object> updates = new HashMap<>();
         updates.put("config." + CURSOR_KEY, now.toString());
