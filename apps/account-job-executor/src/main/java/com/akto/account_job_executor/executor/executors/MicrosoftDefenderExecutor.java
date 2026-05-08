@@ -219,8 +219,10 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
         String folderPath = getStringOrDefault(row, "FolderPath", "");
         String initiatingCmdLine = getStringOrDefault(row, "InitiatingProcessCommandLine", "");
         String initiatingFileName = getStringOrDefault(row, "InitiatingProcessFileName", "");
-        String haystack = processCommandLine + " " + fileName + " " + folderPath + " " + initiatingCmdLine + " " + initiatingFileName;
-        String tool = detectTool(haystack);
+        // Rank fields by signal authority: parent process > self file/path > self command line.
+        // ProcessCommandLine can contain incidental matches (e.g. tasklist patterns), so it's the
+        // weakest signal and only used as a last resort.
+        String tool = detectToolFirst(initiatingFileName, initiatingCmdLine, fileName, folderPath, processCommandLine);
         String host = deviceName + "." + tool + ".defender.microsoft.com";
 
         record.put("path", "/defender/process-events/" + tool + "/" + deviceName);
@@ -948,6 +950,17 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
         String lower = processCommandLine.toLowerCase();
         for (String tool : PROCESS_TOOL_LIST) {
             if (lower.contains(tool.toLowerCase())) return tool;
+        }
+        return PROCESS_TOOL_LIST.get(0);
+    }
+
+    private String detectToolFirst(String... fieldsInPriorityOrder) {
+        for (String field : fieldsInPriorityOrder) {
+            if (field == null || field.isEmpty()) continue;
+            String lower = field.toLowerCase();
+            for (String tool : PROCESS_TOOL_LIST) {
+                if (lower.contains(tool.toLowerCase())) return tool;
+            }
         }
         return PROCESS_TOOL_LIST.get(0);
     }
