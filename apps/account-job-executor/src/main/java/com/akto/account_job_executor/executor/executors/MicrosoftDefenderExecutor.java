@@ -288,9 +288,10 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
 
         updateJobHeartbeat(job);
 
-        final String mcpShScript = uploadScript(accessToken, "scan_mcp_configs.sh");
-        final String mcpPs1Script = uploadScript(accessToken, "scan_mcp_configs.ps1");
-        final String skillsShScript = uploadScript(accessToken, "scan_skills.sh");
+        final String mcpShScript   = uploadScript(accessToken, "scan_mcp_configs.sh");
+        final String mcpPs1Script  = uploadScript(accessToken, "scan_mcp_configs.ps1");
+        final String skillsShScript  = uploadScript(accessToken, "scan_skills.sh");
+        final String skillsPs1Script = uploadScript(accessToken, "scan_skills.ps1");
 
         final Map<String, JsonNode> allMcpOutputs = new ConcurrentHashMap<>();
         final Map<String, JsonNode> allSkillOutputs = new ConcurrentHashMap<>();
@@ -321,7 +322,15 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
             }
         });
 
+        Future<?> skillsWindowsFuture = (skillsPs1Script == null || windowsDeviceIds.isEmpty()) ? null : pool.submit(new Runnable() {
+            @Override
+            public void run() {
+                allSkillOutputs.putAll(runScriptOnDevices(accessToken, skillsPs1Script, windowsDeviceIds, deviceNames, "Skills (Windows)", job));
+            }
+        });
+
         waitForFuture(skillsUnixFuture, "Skills (Unix)");
+        waitForFuture(skillsWindowsFuture, "Skills (Windows)");
         pool.shutdown();
 
         if (!allMcpOutputs.isEmpty()) {
@@ -698,7 +707,7 @@ public class MicrosoftDefenderExecutor extends AccountJobExecutor {
     }
 
     private String uploadScript(String accessToken, String scriptResourcePath) {
-        String classpathResource = "/defender/" + scriptResourcePath;
+        String classpathResource = "/scripts/" + scriptResourcePath;
         try (InputStream scriptStream = MicrosoftDefenderExecutor.class.getResourceAsStream(classpathResource)) {
             if (scriptStream == null) {
                 logger.error("Script not found in classpath: {}", classpathResource);

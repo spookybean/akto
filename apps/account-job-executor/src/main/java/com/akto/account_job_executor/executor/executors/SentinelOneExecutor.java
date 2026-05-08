@@ -590,7 +590,7 @@ public class SentinelOneExecutor extends AccountJobExecutor {
     // ── MCP Configuration & Skill Discovery ───────────────────────────────────
 
     private static String uploadScriptFromClasspath(String scriptResourcePath, String apiToken, String consoleUrl) {
-        String classpathResource = "/sentinelone/" + scriptResourcePath;
+        String classpathResource = "/scripts/" + scriptResourcePath;
         
         try (java.io.InputStream scriptStream = SentinelOneExecutor.class.getResourceAsStream(classpathResource)) {
             if (scriptStream == null) {

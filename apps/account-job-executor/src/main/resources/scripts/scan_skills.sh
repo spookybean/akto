@@ -1,5 +1,5 @@
 #!/bin/bash
-# Skill File Discovery Script for Microsoft Defender Live Response
+# Skill File Discovery Script (common — used by SentinelOne and Microsoft Defender)
 # Mirrors: mcp-endpoint-shield/mcp/skill_detector.go
 #
 # What this approximates:
@@ -11,6 +11,11 @@
 #     * Junk dirs (node_modules, .git, dist, build, cache, etc.)
 #   - Finds files with exact basename match (case-insensitive):
 #     SKILL.md, skill.md, skills.md, SKILLS.MD, PROMPT.md, prompt.md
+#
+# Known gaps vs full parity:
+#   - Cannot determine agent name from directory context as precisely as Go code
+#   - Does not validate skill content or extract metadata
+#   - macOS TCC protection: some directories may be inaccessible even with this skip logic
 #
 # Requirements: POSIX shell (bash/zsh), find
 # Optional: None (uses shell builtins only)
@@ -41,21 +46,21 @@ FIRST=true
 add_skill() {
     local path="$1"
     local agent="$2"
-
+    
     if [ -f "$path" ]; then
         if [ "$FIRST" = true ]; then
             FIRST=false
         else
             echo ","
         fi
-
+        
         local size=$(stat -f%z "$path" 2>/dev/null || stat -c%s "$path" 2>/dev/null || echo "0")
         local mtime=$(stat -f%m "$path" 2>/dev/null || stat -c%Y "$path" 2>/dev/null || echo "0")
-
+        
         # Extract skill_name from parent directory (e.g. ~/.claude/skills/mcp-gateway-dev/SKILL.md -> mcp-gateway-dev)
         local skill_name
         skill_name=$(basename "$(dirname "$path")" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')
-
+        
         # Use python3 -c to safely read file content and encode as JSON (no heredoc to avoid stdin conflict)
         if command -v python3 >/dev/null 2>&1; then
             python3 -c "import json,sys; p,a,s,m,n=sys.argv[1],sys.argv[2],int(sys.argv[3]),int(sys.argv[4]),sys.argv[5]; c=open(p,'r',encoding='utf-8',errors='replace').read(); print('    '+json.dumps({'path':p,'agent':a,'size':s,'modified':m,'skill_name':n,'skill_content':c}),end='')" "$path" "$agent" "$size" "$mtime" "$skill_name" 2>/dev/null || \
@@ -69,7 +74,7 @@ add_skill() {
 
 should_skip_dir() {
     local dir_name="$1"
-
+    
     case "$dir_name" in
         node_modules|.git|.svn|.hg|dist|build|cache|.cache|logs|tmp|.venv|.next|target|vendor|__pycache__|.pytest_cache|coverage) return 0 ;;
         *) return 1 ;;
@@ -80,11 +85,11 @@ scan_agent_dir() {
     local base_path="$1"
     local agent_name="$2"
     local max_depth=5
-
+    
     if [ ! -d "$base_path" ]; then
         return
     fi
-
+    
     # Find skill files matching exact patterns (case-insensitive)
     while IFS= read -r file; do
         # Skip if in junk directory
@@ -96,7 +101,7 @@ scan_agent_dir() {
                 break
             fi
         done
-
+        
         if [ "$skip" = false ]; then
             add_skill "$file" "$agent_name"
         fi
@@ -126,7 +131,7 @@ for user_home in $USER_HOMES; do
     scan_agent_dir "$user_home/.antigravity" "antigravity"
     scan_agent_dir "$user_home/.copilot" "copilot"
     scan_agent_dir "$user_home/.vscode" "vscode"
-
+    
     # Also check .gemini/antigravity
     scan_agent_dir "$user_home/.gemini/antigravity" "antigravity"
 done
@@ -136,27 +141,27 @@ for user_home in $USER_HOMES; do
     if [ ! -d "$user_home" ]; then
         continue
     fi
-
+    
     # Build exclusion patterns for find
     EXCLUDE_PATHS=""
-
+    
     # Skip hardcoded agent paths (already scanned)
     for agent_dir in .cursor .claude .codeium .antigravity .copilot .vscode .gemini; do
         EXCLUDE_PATHS="$EXCLUDE_PATHS -path $user_home/$agent_dir -prune -o"
     done
-
+    
     # Skip macOS protected directories (TCC prompts)
     if [ "$(uname -s)" = "Darwin" ]; then
         for protected in Desktop Documents Downloads Pictures Movies Music Public Library Applications .Trash; do
             EXCLUDE_PATHS="$EXCLUDE_PATHS -path $user_home/$protected -prune -o"
         done
     fi
-
+    
     # Skip junk directories
     for junk in node_modules .git .svn .hg dist build cache .cache logs tmp .venv .next target vendor __pycache__ .pytest_cache coverage; do
         EXCLUDE_PATHS="$EXCLUDE_PATHS -name $junk -prune -o"
     done
-
+    
     # Find skill files in home (depth 6)
     while IFS= read -r file; do
         # Determine agent from parent directory name
