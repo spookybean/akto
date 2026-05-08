@@ -485,15 +485,13 @@ public class JiraIntegrationAction extends UserAction implements ServletRequestA
         }
 
         this.projectAndIssueMap = new HashMap<>();
-        try {
-            for (Map.Entry<String, ProjectMapping> entry : projectMappings.entrySet()) {
+        for (Map.Entry<String, ProjectMapping> entry : projectMappings.entrySet()) {
+            try {
                 List<BasicDBObject> issueTypes = getProjectMetadata(entry.getKey());
                 this.projectAndIssueMap.put(entry.getKey(), issueTypes);
+            } catch (Exception ex) {
+                loggerMaker.errorAndAddToDb(ex, "Error while fetching project metadata for project " + entry.getKey() + ", skipping");
             }
-        } catch (Exception ex) {
-            loggerMaker.error("Error while fetching project metadata", ex);
-            addActionError("Error while fetching project metadata");
-            return Action.ERROR.toUpperCase();
         }
 
         JiraIntegration existingIntegration = JiraIntegrationDao.instance.findOne(new BasicDBObject());
