@@ -1,6 +1,7 @@
 package com.akto.utils;
 
 import com.akto.log.LoggerMaker;
+import com.akto.util.http_util.CoreHTTPClient;
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -13,7 +14,7 @@ import java.util.concurrent.TimeUnit;
  * Sends traffic messages to the mini-runtime HTTP ingest endpoint
  * (POST /utility/ingestTraffic) instead of Kafka.
  *
- * Enabled by setting USE_HTTP_INGEST=true.
+ * Enabled by setting USE_HTTP_INGEST=true in data-ingestion-service.
  * Target URL: TRAFFIC_INGEST_URL (default: http://localhost:8001/utility/ingestTraffic).
  *
  * Note: guardrails publishing is not supported in HTTP mode.
@@ -24,7 +25,7 @@ public class HttpTrafficPublisher implements TrafficPublisher {
 
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
-    private static final OkHttpClient HTTP_CLIENT = new OkHttpClient.Builder()
+    private static final OkHttpClient HTTP_CLIENT = CoreHTTPClient.client.newBuilder()
             .connectTimeout(5, TimeUnit.SECONDS)
             .writeTimeout(10, TimeUnit.SECONDS)
             .readTimeout(10, TimeUnit.SECONDS)
