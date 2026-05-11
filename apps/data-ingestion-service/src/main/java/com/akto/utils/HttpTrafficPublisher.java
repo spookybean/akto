@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit;
  * (POST /utility/ingestTraffic) instead of Kafka.
  *
  * Enabled by setting USE_HTTP_INGEST=true in data-ingestion-service.
- * Target URL: TRAFFIC_INGEST_URL (default: http://localhost:8001/utility/ingestTraffic).
+ * Requires TRAFFIC_INGEST_URL to be set, e.g. http://mini-runtime-svc:8001
  *
  * Note: guardrails publishing is not supported in HTTP mode.
  */
@@ -34,15 +34,21 @@ public class HttpTrafficPublisher implements TrafficPublisher {
     private final String ingestUrl;
 
     public HttpTrafficPublisher() {
-        String url = System.getenv("TRAFFIC_INGEST_URL");
-        this.ingestUrl = (url != null && !url.trim().isEmpty())
-                ? url.trim()
-                : "http://localhost:8001/utility/ingestTraffic";
-        logger.infoAndAddToDb("HttpTrafficPublisher initialized, target: " + this.ingestUrl);
+        String base = System.getenv("TRAFFIC_INGEST_URL");
+        if (base == null || base.trim().isEmpty()) {
+            logger.errorAndAddToDb("TRAFFIC_INGEST_URL env var is not set — HttpTrafficPublisher will drop all messages");
+            this.ingestUrl = null;
+        } else {
+            this.ingestUrl = base.trim() + "/utility/ingestTraffic";
+            logger.infoAndAddToDb("HttpTrafficPublisher initialized, target: " + this.ingestUrl);
+        }
     }
 
     @Override
     public void publish(String message, String primaryTopic, boolean publishToGuardrails) {
+        if (ingestUrl == null) {
+            return;
+        }
         RequestBody body = RequestBody.create(message, JSON);
         Request request = new Request.Builder()
                 .url(ingestUrl)
