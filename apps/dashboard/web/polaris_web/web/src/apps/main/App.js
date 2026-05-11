@@ -132,6 +132,7 @@ import IdentitiesPage from "../dashboard/pages/nhi_governance/IdentitiesPage.jsx
 import ViolationsPage from "../dashboard/pages/nhi_governance/ViolationsPage.jsx";
 import PoliciesPage from "../dashboard/pages/nhi_governance/PoliciesPage.jsx";
 import AllowedHostsForPac from "../dashboard/pages/settings/allowed_hosts/AllowedHostsForPac.jsx";
+import NewRelic from "../dashboard/pages/settings/integrations/NewRelic.jsx";
 
 // if you add a component in a new path, please verify the search implementation in function -> 'getSearchItemsArr' in func.js
 
@@ -554,6 +555,10 @@ const router = createBrowserRouter([
                     {
                         path: "integrations/gmailWebhooks/create_custom_webhook",
                         element: <GmailWebhookCore/>,
+                    },
+                    {
+                        path: "integrations/new_relic",
+                        element: <NewRelic/>,
                     },
                     {
                         path: "logs",

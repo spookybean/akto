@@ -1079,7 +1079,28 @@ const settingRequests = {
             method: 'post',
             data: {patternValue, connectorType}
         })
-    }
+    },
+    fetchNewRelicIntegration() {
+        return request({
+            url: '/api/fetchNewRelicIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
+    addNewRelicIntegration(apiKey) {
+        return request({
+            url: '/api/addNewRelicIntegration',
+            method: 'post',
+            data: {apiKey}
+        })
+    },
+    removeNewRelicIntegration() {
+        return request({
+            url: '/api/removeNewRelicIntegration',
+            method: 'post',
+            data: {}
+        })
+    },
 }
 
 export default settingRequests
