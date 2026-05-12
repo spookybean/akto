@@ -985,6 +985,10 @@ public class ApiCollectionsAction extends UserAction {
 
     public String updateSkillBlockStatus() {
         try {
+            if (this.apiCollectionIds == null || this.apiCollectionIds.isEmpty()) {
+                addActionError("No collections provided");
+                return ERROR.toUpperCase();
+            }
             if (this.skillName == null || this.skillName.isEmpty()) {
                 addActionError("Skill name required");
                 return ERROR.toUpperCase();
@@ -992,35 +996,32 @@ public class ApiCollectionsAction extends UserAction {
 
             // Dual-write: keep api_info in sync for legacy readers (ApiEndpoints.jsx etc.)
             // and update mcp_audit_info (the new source of truth for the Skills tab).
-            long apiInfoMatched = 0;
-            if (this.apiCollectionIds != null && !this.apiCollectionIds.isEmpty()) {
-                String skillUrl = "/skills/" + this.skillName;
-                UpdateResult apiInfoResult = ApiInfoDao.instance.updateMany(
-                    Filters.and(
-                        Filters.in(ApiInfo.ID_API_COLLECTION_ID, this.apiCollectionIds),
-                        Filters.eq(ApiInfo.ID_URL, skillUrl)
-                    ),
-                    Updates.set(ApiInfo.IS_SKILL_BLOCKED, this.isSkillBlocked)
-                );
-                apiInfoMatched = apiInfoResult.getMatchedCount();
-            }
+            String skillUrl = "/skills/" + this.skillName;
+            UpdateResult apiInfoResult = ApiInfoDao.instance.updateMany(
+                Filters.and(
+                    Filters.in(ApiInfo.ID_API_COLLECTION_ID, this.apiCollectionIds),
+                    Filters.eq(ApiInfo.ID_URL, skillUrl)
+                ),
+                Updates.set(ApiInfo.IS_SKILL_BLOCKED, this.isSkillBlocked)
+            );
+            long apiInfoMatched = apiInfoResult.getMatchedCount();
 
             // mcp_audit_info: reuse the existing remarks convention used for MCP-server
-            // approval flows ("Rejected" = blocked, "Approved" = explicitly allowed).
+            // approval flows (REMARKS_REJECTED = blocked, REMARKS_APPROVED = explicitly allowed).
             int now = Context.now();
             User user = getSUser();
             String markedBy = (user != null && user.getLogin() != null) ? user.getLogin() : "system";
-            String remarksVal = this.isSkillBlocked ? "Rejected" : "Approved";
+            String remarksVal = this.isSkillBlocked ? McpAuditInfo.REMARKS_REJECTED : McpAuditInfo.REMARKS_APPROVED;
 
             List<Bson> auditFilters = new ArrayList<>();
-            auditFilters.add(Filters.eq(McpAuditInfo.TYPE, "AGENT_SKILL"));
+            auditFilters.add(Filters.eq(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL));
             auditFilters.add(Filters.eq(McpAuditInfo.RESOURCE_NAME, this.skillName));
             if (this.mcpHosts != null && !this.mcpHosts.isEmpty()) {
                 auditFilters.add(Filters.in(McpAuditInfo.MCP_HOST, this.mcpHosts));
             }
 
             List<Bson> auditUpdates = new ArrayList<>();
-            auditUpdates.add(Updates.set("remarks", remarksVal));
+            auditUpdates.add(Updates.set(McpAuditInfo.REMARKS, remarksVal));
             auditUpdates.add(Updates.set(McpAuditInfo.MARKED_BY, markedBy));
             auditUpdates.add(Updates.set(McpAuditInfo.UPDATED_TIMESTAMP, now));
             if (!this.isSkillBlocked) {

@@ -36,14 +36,33 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class AuditDataAction extends UserAction {
     private static final LoggerMaker loggerMaker = new LoggerMaker(AuditDataAction.class, LogDb.DASHBOARD);
-    
+
+    // Cap user-supplied search to keep regex matching bounded and avoid ReDoS-style abuse.
+    private static final int MAX_SEARCH_LENGTH = 256;
+
+    /**
+     * Escapes regex metacharacters in caller-supplied search input and caps its
+     * length so it can be safely embedded in a $regex filter. Returns null when
+     * the input is blank.
+     */
+    private static String sanitizeSearch(String raw) {
+        if (raw == null) return null;
+        String trimmed = raw.trim();
+        if (trimmed.isEmpty()) return null;
+        if (trimmed.length() > MAX_SEARCH_LENGTH) trimmed = trimmed.substring(0, MAX_SEARCH_LENGTH);
+        return Pattern.quote(trimmed);
+    }
+
+
     // Holds either List<McpAuditInfo> (non-merged path) or List<BasicDBObject> (merged path
     // — see runMergedAggregation / runChildrenForAgentServer). Both serialize to JSON objects,
     // so the frontend reads res.auditData uniformly and branches on the presence of merged-only
@@ -108,10 +127,11 @@ public class AuditDataAction extends UserAction {
             int effectiveSortOrder = (sortOrder == 1) ? 1 : -1;
 
             List<Bson> andFilters = new ArrayList<>();
-            andFilters.add(Filters.eq(McpAuditInfo.TYPE, "AGENT_SKILL"));
+            andFilters.add(Filters.eq(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL));
 
-            if (searchString != null && !searchString.trim().isEmpty()) {
-                andFilters.add(Filters.regex(McpAuditInfo.RESOURCE_NAME, searchString.trim(), "i"));
+            String safeSearch = sanitizeSearch(searchString);
+            if (safeSearch != null) {
+                andFilters.add(Filters.regex(McpAuditInfo.RESOURCE_NAME, safeSearch, "i"));
             }
 
             // Caller-supplied filters: pass-through equality / $in on top-level fields.
@@ -152,34 +172,41 @@ public class AuditDataAction extends UserAction {
             int effectiveLimit = (limit <= 0) ? 50 : Math.min(limit, 500);
             int effectiveSkip = Math.max(skip, 0);
 
-            // Source: mcp_audit_info (type=AGENT_SKILL). type_-1 index covers the match.
-            // resourceName is the skill name; mcpHost is the bare AI agent name (e.g. "codex").
-            // Block state is encoded in `remarks` ("Rejected" = blocked) — same convention used
-            // for MCP-server approval flows in updateAuditData below.
-            List<Bson> pipeline = new ArrayList<>();
-            pipeline.add(Aggregates.match(Filters.eq(McpAuditInfo.TYPE, "AGENT_SKILL")));
+            // Two-step design — each step's working set stays well under the Mongo
+            // pipeline memory cap regardless of total AGENT_SKILL row count.
+            //
+            // Step 1: page through unique skill names with cheap per-skill scalars
+            //         ($max lastDetected, $max remarks — strings compare lexicographically,
+            //         so McpAuditInfo.REMARKS_REJECTED > McpAuditInfo.REMARKS_APPROVED gives us the "any rejected" flag for free).
+            //         No $addToSet here; the accumulator is O(1) per group.
+            // Step 2: for the (≤ limit) skills on this page, fetch the distinct mcpHost
+            //         values in a second aggregation that is bounded by page size.
+            // Step 3: resolve mcpHost → apiCollectionIds via a single api_collections find.
 
-            if (searchString != null && !searchString.trim().isEmpty()) {
-                pipeline.add(Aggregates.match(
-                    Filters.regex(McpAuditInfo.RESOURCE_NAME, searchString.trim(), "i")));
+            // ---- Step 1: paginated names + scalars ---------------------------------
+            List<Bson> namesPipeline = new ArrayList<>();
+            namesPipeline.add(Aggregates.match(Filters.eq(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL)));
+
+            String safeSearch = sanitizeSearch(searchString);
+            if (safeSearch != null) {
+                namesPipeline.add(Aggregates.match(
+                    Filters.regex(McpAuditInfo.RESOURCE_NAME, safeSearch, "i")));
             }
 
-            pipeline.add(Aggregates.group("$" + McpAuditInfo.RESOURCE_NAME,
-                Accumulators.addToSet("aiAgents", "$" + McpAuditInfo.MCP_HOST),
+            namesPipeline.add(Aggregates.group("$" + McpAuditInfo.RESOURCE_NAME,
                 Accumulators.max("lastSeen", "$" + McpAuditInfo.LAST_DETECTED),
-                // A skill is blocked if ANY of its (skill, mcpHost) audit rows has remarks="Rejected".
-                Accumulators.addToSet("remarksSet", "$remarks")
+                Accumulators.max("remarksMax", "$" + McpAuditInfo.REMARKS)
             ));
 
             String effectiveSortKey = (sortKey == null || sortKey.isEmpty()) ? "lastSeen" : sortKey;
             int effectiveSortOrder = (sortOrder == 1) ? 1 : -1;
-            pipeline.add(Aggregates.sort(
+            namesPipeline.add(Aggregates.sort(
                 effectiveSortOrder == 1
                     ? Sorts.ascending(effectiveSortKey)
                     : Sorts.descending(effectiveSortKey)
             ));
 
-            pipeline.add(Aggregates.facet(
+            namesPipeline.add(Aggregates.facet(
                 new com.mongodb.client.model.Facet("rows", Arrays.asList(
                     Aggregates.skip(effectiveSkip),
                     Aggregates.limit(effectiveLimit)
@@ -187,11 +214,8 @@ public class AuditDataAction extends UserAction {
                 new com.mongodb.client.model.Facet("count", Arrays.asList(Aggregates.count("total")))
             ));
 
-            // allowDiskUse: spill $group/$facet to disk if the AGENT_SKILL row count
-            // grows past the 100MB in-memory cap rather than throwing OOM.
             List<BasicDBObject> facetOut = McpAuditInfoDao.instance.getMCollection()
-                .aggregate(pipeline, BasicDBObject.class)
-                .allowDiskUse(true)
+                .aggregate(namesPipeline, BasicDBObject.class)
                 .into(new ArrayList<>());
 
             List<BasicDBObject> rows = new ArrayList<>();
@@ -214,24 +238,47 @@ public class AuditDataAction extends UserAction {
                 }
             }
 
-            // Collect every mcpHost referenced in this page so we can resolve them to
-            // apiCollectionIds in one bulk lookup against api_collections.
-            Set<String> allHosts = new java.util.LinkedHashSet<>();
+            // ---- Step 2: fetch agents for the (≤ limit) skills on this page --------
+            List<String> pageSkillNames = new ArrayList<>();
             for (BasicDBObject row : rows) {
-                Object agents = row.get("aiAgents");
-                if (agents instanceof List) {
+                Object id = row.get("_id");
+                if (id != null) pageSkillNames.add(id.toString());
+            }
+
+            Map<String, List<String>> skillToAgents = new HashMap<>();
+            if (!pageSkillNames.isEmpty()) {
+                List<Bson> agentsPipeline = Arrays.asList(
+                    Aggregates.match(Filters.and(
+                        Filters.eq(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL),
+                        Filters.in(McpAuditInfo.RESOURCE_NAME, pageSkillNames)
+                    )),
+                    Aggregates.group("$" + McpAuditInfo.RESOURCE_NAME,
+                        Accumulators.addToSet("agents", "$" + McpAuditInfo.MCP_HOST))
+                );
+                for (BasicDBObject row : McpAuditInfoDao.instance.getMCollection()
+                        .aggregate(agentsPipeline, BasicDBObject.class)) {
+                    Object id = row.get("_id");
+                    Object agents = row.get("agents");
+                    if (id == null || !(agents instanceof List)) continue;
+                    List<String> agentList = new ArrayList<>();
                     for (Object a : (List<?>) agents) {
-                        if (a != null) allHosts.add(a.toString());
+                        if (a != null) agentList.add(a.toString());
                     }
+                    skillToAgents.put(id.toString(), agentList);
                 }
             }
 
-            // Build mcpHost -> [collectionId] map by matching hostName suffix ".<mcpHost>".
+            // ---- Step 3: resolve mcpHost → apiCollectionIds ------------------------
+            Set<String> allHosts = new LinkedHashSet<>();
+            for (List<String> agentList : skillToAgents.values()) {
+                allHosts.addAll(agentList);
+            }
+
             Map<String, List<Integer>> hostToCollectionIds = new HashMap<>();
             if (!allHosts.isEmpty()) {
                 List<Bson> orFilters = new ArrayList<>();
                 for (String h : allHosts) {
-                    orFilters.add(Filters.regex(ApiCollection.HOST_NAME, "\\." + java.util.regex.Pattern.quote(h) + "$"));
+                    orFilters.add(Filters.regex(ApiCollection.HOST_NAME, "\\." + Pattern.quote(h) + "$"));
                 }
                 for (ApiCollection col : ApiCollectionsDao.instance.getMCollection()
                         .find(Filters.or(orFilters))
@@ -246,30 +293,26 @@ public class AuditDataAction extends UserAction {
             }
 
             for (BasicDBObject row : rows) {
-                row.put("skillName", row.get("_id"));
+                Object id = row.get("_id");
+                String name = id != null ? id.toString() : "";
+                row.put("skillName", name);
                 row.removeField("_id");
 
-                boolean blocked = false;
-                Object remarksObj = row.get("remarksSet");
-                if (remarksObj instanceof List) {
-                    for (Object r : (List<?>) remarksObj) {
-                        if (r != null && "Rejected".equals(r.toString())) { blocked = true; break; }
-                    }
-                }
+                // remarksMax holds the lexicographic max across this skill's audit rows;
+                // McpAuditInfo.REMARKS_REJECTED sorts after McpAuditInfo.REMARKS_APPROVED so any rejected row wins → blocked.
+                boolean blocked = McpAuditInfo.REMARKS_REJECTED.equals(row.get("remarksMax"));
                 row.put("isSkillBlocked", blocked);
-                row.removeField("remarksSet");
+                row.removeField("remarksMax");
 
-                Set<Integer> collIds = new java.util.LinkedHashSet<>();
-                Object agents = row.get("aiAgents");
-                if (agents instanceof List) {
-                    for (Object a : (List<?>) agents) {
-                        if (a == null) continue;
-                        List<Integer> ids = hostToCollectionIds.get(a.toString());
-                        if (ids != null) collIds.addAll(ids);
-                    }
+                List<String> agentList = skillToAgents.getOrDefault(name, Collections.emptyList());
+                row.put("aiAgents", new ArrayList<>(agentList));
+
+                Set<Integer> collIds = new LinkedHashSet<>();
+                for (String agent : agentList) {
+                    List<Integer> ids = hostToCollectionIds.get(agent);
+                    if (ids != null) collIds.addAll(ids);
                 }
                 row.put("apiCollectionIds", new ArrayList<>(collIds));
-                row.put("apiAccessTypes", new ArrayList<>());
             }
 
             response = new BasicDBObject();
@@ -311,7 +354,7 @@ public class AuditDataAction extends UserAction {
             }
             Bson filter = Filters.and(
                 Filters.eq(McpAuditInfo.MCP_HOST, mcpName),
-                Filters.ne(McpAuditInfo.TYPE, "AGENT_SKILL")
+                Filters.ne(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL)
             );
             mcpAuditInfoList = McpAuditInfoDao.instance.findAll(filter, 0, 1_000, null);
             return SUCCESS.toUpperCase();
@@ -342,11 +385,11 @@ public class AuditDataAction extends UserAction {
             // still sit in mcp_audit_info do not double-surface on the All / MCP tabs.
             Bson filter = Filters.and(
                 Filters.eq(McpAuditInfo.CONTEXT_SOURCE, Context.contextSource.get().name()),
-                Filters.ne(McpAuditInfo.TYPE, "AGENT_SKILL")
+                Filters.ne(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL)
             );
             List<Bson> legacyParts = new ArrayList<>();
             legacyParts.add(Filters.exists(McpAuditInfo.CONTEXT_SOURCE, false));
-            legacyParts.add(Filters.ne(McpAuditInfo.TYPE, "AGENT_SKILL"));
+            legacyParts.add(Filters.ne(McpAuditInfo.TYPE, McpAuditInfo.TYPE_AGENT_SKILL));
             if (collectionsIds != null) {
                 legacyParts.add(Filters.in(McpAuditInfo.HOST_COLLECTION_ID, collectionsIds));
             }
@@ -644,14 +687,14 @@ public class AuditDataAction extends UserAction {
 
     // Priority: Rejected=0, ActiveConditional=1, Approved=2, ExpiredConditional=3, Pending=4
     // Expired conditional loses to both Rejected and Approved - reverts to null (Pending in UI).
-    // Only "Conditionally Approved" entries are checked for expiry; "Approved" with stale
+    // Only "Conditionally Approved" entries are checked for expiry; McpAuditInfo.REMARKS_APPROVED with stale
     // approvalConditions in DB is still treated as Approved.
     private static int remarksPriority(String r, Object cond, long nowEpochSeconds) {
-        if ("Rejected".equals(r)) return 0;
+        if (McpAuditInfo.REMARKS_REJECTED.equals(r)) return 0;
         if ("Conditionally Approved".equals(r)) {
             return isConditionalApprovalExpired(cond, nowEpochSeconds) ? 3 : 1;
         }
-        if ("Approved".equals(r)) return 2;
+        if (McpAuditInfo.REMARKS_APPROVED.equals(r)) return 2;
         return 4;
     }
 
@@ -689,7 +732,7 @@ public class AuditDataAction extends UserAction {
         }
 
         if (chosenPriority < Integer.MAX_VALUE) {
-            if (chosenPriority == 3) displayRemarks = "Rejected";
+            if (chosenPriority == 3) displayRemarks = McpAuditInfo.REMARKS_REJECTED;
             row.put(McpAuditInfo.REMARKS, displayRemarks);
             row.put(McpAuditInfo.MARKED_BY, displayMarkedBy);
             // Expose approvalConditions for Rejected and active-conditional statuses only.
@@ -843,7 +886,7 @@ public class AuditDataAction extends UserAction {
                 updates.add(Updates.set("remarks", remarks));
                 updates.add(Updates.set("markedBy", markedBy));
                 updates.add(Updates.set("updatedTimestamp", currentTime));
-                if ("Approved".equals(remarks)) {
+                if (McpAuditInfo.REMARKS_APPROVED.equals(remarks)) {
                     updates.add(Updates.set("approvedAt", currentTime));
                 }
                 updates.add(Updates.unset(McpAuditInfo.APPROVAL_CONDITIONS));
@@ -859,7 +902,7 @@ public class AuditDataAction extends UserAction {
             // When blocking for all agents, stamp blockAll=true on every matched server record
             // so newly arriving records for this server name are auto-blocked at ingest time.
             if (mcpServerForAllAgents != null && !mcpServerForAllAgents.trim().isEmpty()
-                    && "Rejected".equals(remarks)) {
+                    && McpAuditInfo.REMARKS_REJECTED.equals(remarks)) {
                 McpAuditInfoDao.instance.updateMany(
                     Filters.in(Constants.ID, targetIds),
                     Updates.set(McpAuditInfo.BLOCK_ALL, true)
@@ -869,7 +912,7 @@ public class AuditDataAction extends UserAction {
             // When approving any server, clear blockAll=false on every mcp-server record
             // sharing that server name — derived server-side from the approved record's
             // resourceName so the UI doesn't need to send anything extra.
-            if ("Approved".equals(remarks) && !targetIds.isEmpty()) {
+            if (McpAuditInfo.REMARKS_APPROVED.equals(remarks) && !targetIds.isEmpty()) {
                 String approvedServerName = null;
                 McpAuditInfo approvedRec = McpAuditInfoDao.instance.getMCollection()
                         .find(Filters.eq(Constants.ID, targetIds.get(0))).first();
