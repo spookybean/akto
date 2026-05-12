@@ -51,7 +51,7 @@ function NewRelic() {
             func.setToast(true, false, "Successfully added New Relic Integration")
             fetchNewRelicIntegration()
         } catch (error) {
-            func.setToast(true, true, err?.response?.data?.actionErrors?.[0] || "Failed to add New Relic Integration")
+            func.setToast(true, true, error?.response?.data?.actionErrors?.[0] || "Failed to add New Relic Integration")
         } finally {
             setIsSaving(false)
         }
@@ -74,7 +74,7 @@ function NewRelic() {
         return isSaving || (apiKey === null ? true : !apiKey?.trim())
     }
 
-    const cardContent = "Send metrics and heartbeart events from Akto's hybrid modules to your New Relic dashboard."
+    const cardContent = "Send metrics and heartbeat events from Akto's hybrid modules to your New Relic dashboard."
 
     const newRelicCard = (
         <LegacyCard
