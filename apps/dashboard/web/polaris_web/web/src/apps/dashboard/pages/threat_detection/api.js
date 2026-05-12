@@ -97,7 +97,7 @@ const threatDetectionRequests = {
     },
     getActorsCountPerCounty(startTs, endTs) {
         return request({
-            url: '/api/getActorsCountPerCounty',
+            url: '/api/fetchActorsCountPerCounty',
             method: 'post',
             data: {startTs, endTs}
         })

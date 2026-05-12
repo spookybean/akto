@@ -11161,9 +11161,9 @@
             </result>
         </action>
 
-        <action name="api/getActorsCountPerCounty"
+        <action name="api/fetchActorsCountPerCounty"
             class="com.akto.action.threat_detection.ThreatActorAction"
-            method="getActorsCountPerCounty">
+            method="fetchActorsCountPerCounty">
             <interceptor-ref name="json" />
             <interceptor-ref name="defaultStack" />
             <interceptor-ref name="usageInterceptor">
