@@ -187,8 +187,11 @@ public class AuditDataAction extends UserAction {
                 new com.mongodb.client.model.Facet("count", Arrays.asList(Aggregates.count("total")))
             ));
 
+            // allowDiskUse: spill $group/$facet to disk if the AGENT_SKILL row count
+            // grows past the 100MB in-memory cap rather than throwing OOM.
             List<BasicDBObject> facetOut = McpAuditInfoDao.instance.getMCollection()
                 .aggregate(pipeline, BasicDBObject.class)
+                .allowDiskUse(true)
                 .into(new ArrayList<>());
 
             List<BasicDBObject> rows = new ArrayList<>();
