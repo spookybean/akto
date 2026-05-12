@@ -5160,7 +5160,9 @@
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
-            <result name="SUCCESS"  type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">chattyDomains,aiDomains,domainKey,domainsToAdd,domainsToRemove,deletedPatternResult,patternValue,connectorType</param>
+            </result>
         </action>
 
         <action name="api/updatePrivateCidrIps" class="com.akto.action.AdminSettingsAction" method="editPrivateCidrList">
