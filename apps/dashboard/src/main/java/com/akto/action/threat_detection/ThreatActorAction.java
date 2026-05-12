@@ -360,7 +360,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     }
   }
 
-    public static Wafv2Client getAwsWafClient(String accessKey, String secretKey, String region) {
+    public static Wafv2Client fetchAwsWafClient(String accessKey, String secretKey, String region) {
       return Wafv2Client.builder()
           .region(Region.of(region))
           .credentialsProvider(StaticCredentialsProvider.create(
@@ -369,7 +369,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
           .build();
     }
 
-    public static GetIpSetResponse getIpSet(Wafv2Client wafv2Client, String ruleSetName, String ruleSetId) {
+    public static GetIpSetResponse fetchIpSet(Wafv2Client wafv2Client, String ruleSetName, String ruleSetId) {
         GetIpSetRequest getRequest = GetIpSetRequest.builder()
                     .name(ruleSetName)
                     .scope(SCOPE)
@@ -386,7 +386,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         return getResponse;
     }
 
-    private static Config.CloudflareWafConfig getCloudflareConfig() {
+    private static Config.CloudflareWafConfig fetchCloudflareConfig() {
         int accId = Context.accountId.get();
         Bson filters = Filters.and(
             Filters.eq(Constants.ID, accId + "_" + Config.ConfigType.CLOUDFLARE_WAF),
@@ -401,7 +401,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     }
 
     public String modifyThreatActorStatusCloudflare() {
-        Config.CloudflareWafConfig cloudflareWafConfig = getCloudflareConfig();
+        Config.CloudflareWafConfig cloudflareWafConfig = fetchCloudflareConfig();
 
         if (!hasValidListConfig(cloudflareWafConfig)) {
             addActionError("Cloudflare WAF integration not configured properly.");
@@ -430,7 +430,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
             return ERROR.toUpperCase();
         }
 
-        Config.CloudflareWafConfig cloudflareWafConfig = getCloudflareConfig();
+        Config.CloudflareWafConfig cloudflareWafConfig = fetchCloudflareConfig();
 
         if (!hasValidListConfig(cloudflareWafConfig)) {
             addActionError("Cloudflare WAF integration not configured properly.");
@@ -476,7 +476,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
         }
 
         try {
-            wafClient = getAwsWafClient(awsWafConfig.getAwsAccessKey(), awsWafConfig.getAwsSecretKey(), awsWafConfig.getRegion());
+            wafClient = fetchAwsWafClient(awsWafConfig.getAwsAccessKey(), awsWafConfig.getAwsSecretKey(), awsWafConfig.getRegion());
             //ListWebAcLsResponse webAclsResponse = wafClient.listWebACLs(ListWebAcLsRequest.builder().scope(SCOPE).build());
             loggerMaker.debugAndAddToDb("init aws client, for threat actor block");
         } catch (Exception e) {
