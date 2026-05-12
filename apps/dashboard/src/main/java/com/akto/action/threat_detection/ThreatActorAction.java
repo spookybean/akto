@@ -285,6 +285,9 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
   }
 
   public String fetchAggregateMaliciousRequests() {
+    long t0 = System.currentTimeMillis();
+    loggerMaker.infoAndAddToDb("fetchAggregateMaliciousRequests START ts=" + t0 + " refId=" + refId + " eventType=" + eventType, LogDb.DASHBOARD);
+
     HttpPost post =
         new HttpPost(String.format("%s/api/dashboard/fetchAggregateMaliciousRequests", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
@@ -304,8 +307,11 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     StringEntity requestEntity = new StringEntity(msg, ContentType.APPLICATION_JSON);
     post.setEntity(requestEntity);
 
+    loggerMaker.infoAndAddToDb("fetchAggregateMaliciousRequests BEFORE_HTTP_EXECUTE elapsed=" + (System.currentTimeMillis() - t0) + "ms", LogDb.DASHBOARD);
     try (CloseableHttpResponse resp = this.httpClient.execute(post)) {
+      loggerMaker.infoAndAddToDb("fetchAggregateMaliciousRequests AFTER_HTTP_EXECUTE elapsed=" + (System.currentTimeMillis() - t0) + "ms", LogDb.DASHBOARD);
       String responseBody = EntityUtils.toString(resp.getEntity());
+      loggerMaker.infoAndAddToDb("fetchAggregateMaliciousRequests AFTER_RESPONSE_READ elapsed=" + (System.currentTimeMillis() - t0) + "ms", LogDb.DASHBOARD);
 
       ProtoMessageUtils.<FetchMaliciousEventsResponse>toProtoMessage(
         FetchMaliciousEventsResponse.class, responseBody)
@@ -326,6 +332,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
       return ERROR.toUpperCase();
     }
 
+    loggerMaker.infoAndAddToDb("fetchAggregateMaliciousRequests END totalElapsed=" + (System.currentTimeMillis() - t0) + "ms", LogDb.DASHBOARD);
     return SUCCESS.toUpperCase();
   }
 
