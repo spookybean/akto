@@ -480,26 +480,9 @@ function ThreatDetectionPage() {
             currentEventStatus: data.status || '',
             currentJiraTicketUrl: data.jiraTicketUrl || ''
         });
-        // Update URL silently without triggering React Router re-renders (avoids duplicate fetchSuspectSampleData)
         if (data.nextUrl) {
-            window.history.replaceState(null, '', data.nextUrl);
+            navigate(data.nextUrl, { replace: eventState.currentRefId === data.refId });
         }
-
-        // Fetch sample data directly instead of relying on URL-change useEffect
-        threatDetectionRequests.fetchMaliciousRequest(
-            data.refId, data.eventType || '', data.actor || '', data.filterId
-        ).then((payloadResponse) => {
-            const rawPayloads = payloadResponse?.maliciousPayloadsResponses || [];
-            const maliciousPayloads = rawPayloads.map((p) => ({
-                ...p,
-                orig: redactSampleDataByKeywords(p.orig),
-            }));
-            setEventState(prev => ({ ...prev, rowDataList: maliciousPayloads }));
-            setDetailsLoading(false);
-        }).catch((error) => {
-            func.setToast(true, true, 'Failed to load event. Please try again.');
-            setDetailsLoading(false);
-        });
     }
 
     const handleStatusUpdate = (newStatus) => {
