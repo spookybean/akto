@@ -497,7 +497,6 @@ function ThreatDetectionPage() {
             setEventState(prev => ({ ...prev, rowDataList: maliciousPayloads }));
             setDetailsLoading(false);
         }).catch((error) => {
-            console.error('Error fetching event:', error);
             func.setToast(true, true, 'Failed to load event. Please try again.');
             setDetailsLoading(false);
         });
