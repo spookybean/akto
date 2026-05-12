@@ -184,7 +184,7 @@ function AgentDetails({
         setDescription("");
         setEditableDescription("");
         setIsEditingDescription(false);
-stopLiveFetching();
+        stopLiveFetching();
 
         setLoading(true);
         settingRequests.getMcpServersByAgent(selectedAgent.agentId, selectedAgent.hostname)

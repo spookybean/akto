@@ -1,6 +1,7 @@
 package com.akto.data_actor;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 import com.akto.bulk_update_util.ApiInfoBulkUpdate;
 import com.akto.dao.*;
@@ -23,8 +24,6 @@ import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.threat_detection.ApiHitCountInfoDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
-import com.akto.dao.DeviceDomainConfigDao;
-import com.akto.dto.DeviceDomainConfig;
 import com.akto.dto.APIConfig;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
@@ -89,35 +88,29 @@ public class DbLayer {
         );
     }
 
-    public static void updateDeviceDomainListDelta(String deviceId, String domainKey,
-            List<String> toAdd, List<String> toRemove) {
-        String fieldPath = DeviceDomainConfig.DOMAIN_LISTS + "." + domainKey;
-        Bson filter = Filters.eq("_id", deviceId);
-        UpdateOptions upsertOpt = new UpdateOptions().upsert(true);
+
+    public static void updateAccountDomainsDelta(String domainKey, List<String> toAdd, List<String> toRemove) {
+        Bson filter = AccountSettingsDao.generateFilter();
         if (toAdd != null && !toAdd.isEmpty()) {
-            DeviceDomainConfigDao.instance.getMCollection().updateOne(
-                filter,
-                Updates.combine(
-                    Updates.addEachToSet(fieldPath, toAdd),
-                    Updates.set(DeviceDomainConfig.UPDATED_AT, Context.now())
-                ),
-                upsertOpt
-            );
+            List<String> uniqueToAdd = toAdd.stream()
+                    .filter(d -> d != null && !d.trim().isEmpty())
+                    .map(d -> d.trim().toLowerCase())
+                    .distinct()
+                    .collect(Collectors.toList());
+            if (!uniqueToAdd.isEmpty()) {
+                AccountSettingsDao.instance.getMCollection().updateOne(filter, Updates.addEachToSet(domainKey, uniqueToAdd));
+            }
         }
         if (toRemove != null && !toRemove.isEmpty()) {
-            DeviceDomainConfigDao.instance.getMCollection().updateOne(
-                filter,
-                Updates.combine(
-                    Updates.pullAll(fieldPath, toRemove),
-                    Updates.set(DeviceDomainConfig.UPDATED_AT, Context.now())
-                ),
-                upsertOpt
-            );
+            List<String> normalizedToRemove = toRemove.stream()
+                    .filter(d -> d != null && !d.trim().isEmpty())
+                    .map(d -> d.trim().toLowerCase())
+                    .distinct()
+                    .collect(Collectors.toList());
+            if (!normalizedToRemove.isEmpty()) {
+                AccountSettingsDao.instance.getMCollection().updateOne(filter, Updates.pullAll(domainKey, normalizedToRemove));
+            }
         }
-    }
-
-    public static DeviceDomainConfig fetchDeviceDomainConfig(String deviceId) {
-        return DeviceDomainConfigDao.instance.findOne(Filters.eq("_id", deviceId));
     }
 
     public static void updateCidrList(List<String> cidrList) {

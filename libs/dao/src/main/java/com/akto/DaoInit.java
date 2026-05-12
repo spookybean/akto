@@ -99,7 +99,6 @@ import com.akto.dto.agents.State;
 import com.akto.dto.auth.APIAuth;
 import com.akto.dto.billing.Organization;
 import com.akto.dto.billing.OrganizationFlags;
-import com.akto.dto.DeviceDomainConfig;
 import com.akto.util.enums.GlobalEnums;
 import com.akto.util.enums.GlobalEnums.TicketSource;
 import com.mongodb.ConnectionString;
@@ -341,7 +340,6 @@ public class DaoInit {
         ClassModel<UserAnalysisData.UserAnalysisDataKey> userAnalysisDataKeyClassModel = ClassModel.builder(UserAnalysisData.UserAnalysisDataKey.class).enableDiscriminator(true).build();
         ClassModel<AccountSettings.ProxyPatternInfo> proxyPatternInfoClassModel = ClassModel.builder(AccountSettings.ProxyPatternInfo.class).enableDiscriminator(true).build();
         ClassModel<EndpointMcpConfig> endpointMcpConfigClassModel = ClassModel.builder(EndpointMcpConfig.class).enableDiscriminator(true).build();
-        ClassModel<DeviceDomainConfig> deviceDomainConfigClassModel = ClassModel.builder(DeviceDomainConfig.class).enableDiscriminator(true).build();
         CodecRegistry pojoCodecRegistry = fromProviders(PojoCodecProvider.builder().register(
                 configClassModel, signupInfoClassModel, apiAuthClassModel, attempResultModel, urlTemplateModel,
                 pendingInviteCodeClassModel, rbacClassModel, kafkaHealthMetricClassModel, singleTypeInfoClassModel,
@@ -385,7 +383,7 @@ public class DaoInit {
                 ticketSyncJobParamsClassModel, apiHitCountInfoClassModel, collectionTagsModel, apiSequencesClassModel,
                 endpointShieldLogClassModel, guardrailPoliciesClassModel, ipReputationScoreClassModel, apiIdentifierClassModel, dependencyClassModel,
                 traceClassModel, spanClassModel, toolDefinitionClassModel, userAnalysisDataKeyClassModel, proxyPatternInfoClassModel,
-                mcpAllowlistClassModel, mcpRegistryConfigClassModel, endpointMcpConfigClassModel, deviceDomainConfigClassModel)
+                mcpAllowlistClassModel, mcpRegistryConfigClassModel, endpointMcpConfigClassModel)
             .automatic(true).build());
 
         final CodecRegistry customEnumCodecs = CodecRegistries.fromCodecs(
@@ -491,7 +489,6 @@ public class DaoInit {
 
         ApiInfoDao.instance.createIndicesIfAbsent();
         ApiSequencesDao.instance.createIndicesIfAbsent();
-        DeviceDomainConfigDao.instance.createIndicesIfAbsent();
         RuntimeLogsDao.instance.createIndicesIfAbsent();
         ProtectionLogsDao.instance.createIndicesIfAbsent();
         LogsDao.instance.createIndicesIfAbsent();

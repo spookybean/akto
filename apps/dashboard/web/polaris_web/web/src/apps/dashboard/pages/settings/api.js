@@ -982,13 +982,6 @@ const settingRequests = {
             }
         })
     },
-    fetchDeviceDomainConfig(deviceId) {
-        return request({
-            url: '/api/fetchDeviceDomainConfig',
-            method: 'post',
-            data: { deviceId }
-        })
-    },
     addMcpRegistryIntegration(registries) {
         return request({
             url: '/api/addMcpRegistryIntegration',

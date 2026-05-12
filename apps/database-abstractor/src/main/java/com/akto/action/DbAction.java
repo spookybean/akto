@@ -13,7 +13,6 @@ import com.akto.dto.traffic.SampleData;
 import com.akto.dto.traffic.TrafficInfo;
 import com.akto.dto.traffic_metrics.TrafficMetrics;
 import com.akto.dto.type.SingleTypeInfo;
-import com.akto.dto.DeviceDomainConfig;
 import com.akto.log.LoggerMaker;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.opensymphony.xwork2.Action;
@@ -50,7 +49,6 @@ public class DbAction extends ActionSupport {
     String domainKey;
     List<String> domainsToAdd;
     List<String> domainsToRemove;
-    DeviceDomainConfig deviceDomainConfig;
     List<BasicDBObject> apiInfoList;
     List<BulkUpdates> writesForFilterSampleData;
     List<BulkUpdates> writesForSti;
@@ -136,23 +134,6 @@ public class DbAction extends ActionSupport {
         return Action.SUCCESS.toUpperCase();
     }
 
-    public String updateDeviceDomainListDelta() {
-        try {
-            DbLayer.updateDeviceDomainListDelta(deviceId, domainKey, domainsToAdd, domainsToRemove);
-        } catch (Exception e) {
-            return Action.ERROR.toUpperCase();
-        }
-        return Action.SUCCESS.toUpperCase();
-    }
-
-    public String fetchDeviceDomainConfig() {
-        try {
-            deviceDomainConfig = DbLayer.fetchDeviceDomainConfig(deviceId);
-        } catch (Exception e) {
-            return Action.ERROR.toUpperCase();
-        }
-        return Action.SUCCESS.toUpperCase();
-    }
 
     public String fetchAccountSettings() {
         try {
@@ -847,9 +828,6 @@ public class DbAction extends ActionSupport {
 
     public List<String> getDomainsToRemove() { return domainsToRemove; }
     public void setDomainsToRemove(List<String> domainsToRemove) { this.domainsToRemove = domainsToRemove; }
-
-    public DeviceDomainConfig getDeviceDomainConfig() { return deviceDomainConfig; }
-    public void setDeviceDomainConfig(DeviceDomainConfig deviceDomainConfig) { this.deviceDomainConfig = deviceDomainConfig; }
 
     public List<BasicDBObject> getApiInfoList() {
         return apiInfoList;
