@@ -91,7 +91,7 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     this.httpClient = HttpClients.createDefault();
   }
 
-  public String getActorsCountPerCounty() {
+  public String fetchActorsCountPerCounty() {
     HttpPost post = new HttpPost(String.format("%s/api/dashboard/get_actors_count_per_country", this.getBackendUrl()));
     post.addHeader("Authorization", "Bearer " + this.getApiToken());
     post.addHeader("Content-Type", "application/json");
