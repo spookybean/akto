@@ -982,6 +982,13 @@ const settingRequests = {
             }
         })
     },
+    fetchDeviceDomainConfig(deviceId) {
+        return request({
+            url: '/api/fetchDeviceDomainConfig',
+            method: 'post',
+            data: { deviceId }
+        })
+    },
     addMcpRegistryIntegration(registries) {
         return request({
             url: '/api/addMcpRegistryIntegration',
@@ -1078,6 +1085,13 @@ const settingRequests = {
             url: '/api/deleteProxyPattern',
             method: 'post',
             data: {patternValue, connectorType}
+        })
+    },
+    updateAccountDomains(domainKey, domainsToAdd, domainsToRemove) {
+        return request({
+            url: '/api/updateAccountDomains',
+            method: 'post',
+            data: { domainKey, domainsToAdd, domainsToRemove }
         })
     }
 }

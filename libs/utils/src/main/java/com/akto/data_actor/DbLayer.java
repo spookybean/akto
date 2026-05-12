@@ -23,6 +23,8 @@ import com.akto.dao.monitoring.FilterYamlTemplateDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
 import com.akto.dao.threat_detection.ApiHitCountInfoDao;
 import com.akto.dao.traffic_metrics.TrafficMetricsDao;
+import com.akto.dao.DeviceDomainConfigDao;
+import com.akto.dto.DeviceDomainConfig;
 import com.akto.dto.APIConfig;
 import com.akto.dto.Account;
 import com.akto.dto.AccountSettings;
@@ -85,6 +87,37 @@ public class DbLayer {
                 Filters.eq(ApiCollection.VXLAN_ID, vxlanId),
                 Updates.set(ApiCollection.NAME, name)
         );
+    }
+
+    public static void updateDeviceDomainListDelta(String deviceId, String domainKey,
+            List<String> toAdd, List<String> toRemove) {
+        String fieldPath = DeviceDomainConfig.DOMAIN_LISTS + "." + domainKey;
+        Bson filter = Filters.eq("_id", deviceId);
+        UpdateOptions upsertOpt = new UpdateOptions().upsert(true);
+        if (toAdd != null && !toAdd.isEmpty()) {
+            DeviceDomainConfigDao.instance.getMCollection().updateOne(
+                filter,
+                Updates.combine(
+                    Updates.addEachToSet(fieldPath, toAdd),
+                    Updates.set(DeviceDomainConfig.UPDATED_AT, Context.now())
+                ),
+                upsertOpt
+            );
+        }
+        if (toRemove != null && !toRemove.isEmpty()) {
+            DeviceDomainConfigDao.instance.getMCollection().updateOne(
+                filter,
+                Updates.combine(
+                    Updates.pullAll(fieldPath, toRemove),
+                    Updates.set(DeviceDomainConfig.UPDATED_AT, Context.now())
+                ),
+                upsertOpt
+            );
+        }
+    }
+
+    public static DeviceDomainConfig fetchDeviceDomainConfig(String deviceId) {
+        return DeviceDomainConfigDao.instance.findOne(Filters.eq("_id", deviceId));
     }
 
     public static void updateCidrList(List<String> cidrList) {

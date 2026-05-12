@@ -1,8 +1,10 @@
 package com.akto.action.monitoring;
 
 import com.akto.action.UserAction;
+import com.akto.dao.DeviceDomainConfigDao;
 import com.akto.dao.agentic_sessions.UserAnalysisDataDao;
 import com.akto.dao.monitoring.ModuleInfoDao;
+import com.akto.dto.DeviceDomainConfig;
 import com.akto.dto.agentic_sessions.UserAnalysisData;
 import com.akto.dto.monitoring.EndpointShieldServer;
 import com.akto.dto.monitoring.EndpointShieldLog;
@@ -250,6 +252,23 @@ public class EndpointShieldAgentAction extends UserAction {
             )
         );
 
+        return SUCCESS.toUpperCase();
+    }
+
+    @Getter
+    private DeviceDomainConfig deviceDomainConfig;
+
+    public String fetchDeviceDomainConfig() {
+        if (deviceId == null || deviceId.trim().isEmpty()) {
+            addActionError("Device ID is required");
+            return ERROR.toUpperCase();
+        }
+        try {
+            deviceDomainConfig = DeviceDomainConfigDao.instance.findOne(Filters.eq("_id", deviceId));
+        } catch (Exception e) {
+            addActionError("Error fetching device domain config: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
         return SUCCESS.toUpperCase();
     }
 }
