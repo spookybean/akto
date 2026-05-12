@@ -78,6 +78,34 @@ export default {
         });
     },
 
+    async fetchSkills(skip = 0, limit = 50, sortKey = 'lastSeen', sortOrder = -1, searchString = '') {
+        const resp = await request({
+            url: '/api/fetchSkills',
+            method: 'post',
+            data: { skip, limit, sortKey, sortOrder, searchString }
+        });
+        return resp || { skills: [], total: 0 };
+    },
+
+    // Raw paginated AGENT_SKILL audit rows — same response shape as fetchAuditData
+    // ({ auditData: [...], total: N }). Use this when you need every (skill, mcpHost)
+    // detection record rather than the per-skill summary returned by fetchSkills.
+    async fetchSkillsData(skip = 0, limit = 50, sortKey = 'lastDetected', sortOrder = -1, filters = {}, searchString = '') {
+        const resp = await request({
+            url: '/api/fetchSkillsData',
+            method: 'post',
+            data: { skip, limit, sortKey, sortOrder, filters, searchString }
+        });
+        return resp || { auditData: [], total: 0 };
+    },
+    async updateSkillBlockStatus(apiCollectionIds, skillName, isSkillBlocked, mcpHosts) {
+        return request({
+            url: '/api/updateSkillBlockStatus',
+            method: 'post',
+            data: { apiCollectionIds, skillName, isSkillBlocked, mcpHosts: mcpHosts || [] }
+        });
+    },
+
     async fetchMcpAuditInfoByCollection(apiCollectionId) {
         const id = typeof apiCollectionId === 'string' ? parseInt(apiCollectionId, 10) : apiCollectionId;
         const resp = await request({

@@ -91,6 +91,195 @@ public class AuditDataAction extends UserAction {
     @Setter
     private List<McpAuditInfo> mcpAuditInfoList;
 
+    @Getter
+    private BasicDBObject response;
+
+    // Raw paginated AGENT_SKILL rows from mcp_audit_info — same shape as fetchAuditData
+    // but scoped to type=AGENT_SKILL (which fetchAuditData explicitly excludes). Use this
+    // when you want every (skill, mcpHost) detection record rather than the deduped
+    // per-skill summary that fetchSkills returns.
+    public String fetchSkillsData() {
+        try {
+            if (sortKey == null || sortKey.isEmpty()) {
+                sortKey = McpAuditInfo.LAST_DETECTED;
+            }
+            int effectiveLimit = (limit <= 0) ? 20 : Math.min(limit, 1000);
+            int effectiveSkip = Math.max(skip, 0);
+            int effectiveSortOrder = (sortOrder == 1) ? 1 : -1;
+
+            List<Bson> andFilters = new ArrayList<>();
+            andFilters.add(Filters.eq(McpAuditInfo.TYPE, "AGENT_SKILL"));
+
+            if (searchString != null && !searchString.trim().isEmpty()) {
+                andFilters.add(Filters.regex(McpAuditInfo.RESOURCE_NAME, searchString.trim(), "i"));
+            }
+
+            // Caller-supplied filters: pass-through equality / $in on top-level fields.
+            // markedBy/remarks/mcpHost/contextSource are the common ones for audit-style UI.
+            if (filters != null) {
+                for (Map.Entry<String, List> e : filters.entrySet()) {
+                    if (e.getKey() == null || e.getValue() == null || e.getValue().isEmpty()) continue;
+                    // Ignore client-side type override; AGENT_SKILL is hard-pinned for this endpoint.
+                    if ("type".equals(e.getKey())) continue;
+                    andFilters.add(Filters.in(e.getKey(), e.getValue()));
+                }
+            }
+
+            Bson finalFilter = andFilters.size() == 1 ? andFilters.get(0) : Filters.and(andFilters);
+
+            long totalCount = McpAuditInfoDao.instance.getMCollection().countDocuments(finalFilter);
+
+            Bson sort = effectiveSortOrder == 1
+                ? Sorts.ascending(sortKey)
+                : Sorts.descending(sortKey);
+
+            List<McpAuditInfo> rows = McpAuditInfoDao.instance.findAll(
+                finalFilter, effectiveSkip, effectiveLimit, sort
+            );
+
+            this.auditData = rows;
+            this.total = totalCount;
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching skills data: " + e.getMessage(), LogDb.DASHBOARD);
+            addActionError("Error fetching skills data: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
+    public String fetchSkills() {
+        try {
+            int effectiveLimit = (limit <= 0) ? 50 : Math.min(limit, 500);
+            int effectiveSkip = Math.max(skip, 0);
+
+            // Source: mcp_audit_info (type=AGENT_SKILL). type_-1 index covers the match.
+            // resourceName is the skill name; mcpHost is the bare AI agent name (e.g. "codex").
+            // Block state is encoded in `remarks` ("Rejected" = blocked) — same convention used
+            // for MCP-server approval flows in updateAuditData below.
+            List<Bson> pipeline = new ArrayList<>();
+            pipeline.add(Aggregates.match(Filters.eq(McpAuditInfo.TYPE, "AGENT_SKILL")));
+
+            if (searchString != null && !searchString.trim().isEmpty()) {
+                pipeline.add(Aggregates.match(
+                    Filters.regex(McpAuditInfo.RESOURCE_NAME, searchString.trim(), "i")));
+            }
+
+            pipeline.add(Aggregates.group("$" + McpAuditInfo.RESOURCE_NAME,
+                Accumulators.addToSet("aiAgents", "$" + McpAuditInfo.MCP_HOST),
+                Accumulators.max("lastSeen", "$" + McpAuditInfo.LAST_DETECTED),
+                // A skill is blocked if ANY of its (skill, mcpHost) audit rows has remarks="Rejected".
+                Accumulators.addToSet("remarksSet", "$remarks")
+            ));
+
+            String effectiveSortKey = (sortKey == null || sortKey.isEmpty()) ? "lastSeen" : sortKey;
+            int effectiveSortOrder = (sortOrder == 1) ? 1 : -1;
+            pipeline.add(Aggregates.sort(
+                effectiveSortOrder == 1
+                    ? Sorts.ascending(effectiveSortKey)
+                    : Sorts.descending(effectiveSortKey)
+            ));
+
+            pipeline.add(Aggregates.facet(
+                new com.mongodb.client.model.Facet("rows", Arrays.asList(
+                    Aggregates.skip(effectiveSkip),
+                    Aggregates.limit(effectiveLimit)
+                )),
+                new com.mongodb.client.model.Facet("count", Arrays.asList(Aggregates.count("total")))
+            ));
+
+            List<BasicDBObject> facetOut = McpAuditInfoDao.instance.getMCollection()
+                .aggregate(pipeline, BasicDBObject.class)
+                .into(new ArrayList<>());
+
+            List<BasicDBObject> rows = new ArrayList<>();
+            int totalCount = 0;
+            if (!facetOut.isEmpty()) {
+                BasicDBObject doc = facetOut.get(0);
+                Object rowsObj = doc.get("rows");
+                if (rowsObj instanceof List) {
+                    for (Object r : (List<?>) rowsObj) {
+                        if (r instanceof BasicDBObject) rows.add((BasicDBObject) r);
+                    }
+                }
+                Object countList = doc.get("count");
+                if (countList instanceof List && !((List<?>) countList).isEmpty()) {
+                    Object first = ((List<?>) countList).get(0);
+                    if (first instanceof BasicDBObject) {
+                        Object t = ((BasicDBObject) first).get("total");
+                        if (t instanceof Number) totalCount = ((Number) t).intValue();
+                    }
+                }
+            }
+
+            // Collect every mcpHost referenced in this page so we can resolve them to
+            // apiCollectionIds in one bulk lookup against api_collections.
+            Set<String> allHosts = new java.util.LinkedHashSet<>();
+            for (BasicDBObject row : rows) {
+                Object agents = row.get("aiAgents");
+                if (agents instanceof List) {
+                    for (Object a : (List<?>) agents) {
+                        if (a != null) allHosts.add(a.toString());
+                    }
+                }
+            }
+
+            // Build mcpHost -> [collectionId] map by matching hostName suffix ".<mcpHost>".
+            Map<String, List<Integer>> hostToCollectionIds = new HashMap<>();
+            if (!allHosts.isEmpty()) {
+                List<Bson> orFilters = new ArrayList<>();
+                for (String h : allHosts) {
+                    orFilters.add(Filters.regex(ApiCollection.HOST_NAME, "\\." + java.util.regex.Pattern.quote(h) + "$"));
+                }
+                for (ApiCollection col : ApiCollectionsDao.instance.getMCollection()
+                        .find(Filters.or(orFilters))
+                        .projection(Projections.include(Constants.ID, ApiCollection.HOST_NAME))) {
+                    String hn = col.getHostName();
+                    if (hn == null) continue;
+                    int dot = hn.lastIndexOf('.');
+                    if (dot < 0) continue;
+                    String host = hn.substring(dot + 1);
+                    hostToCollectionIds.computeIfAbsent(host, k -> new ArrayList<>()).add(col.getId());
+                }
+            }
+
+            for (BasicDBObject row : rows) {
+                row.put("skillName", row.get("_id"));
+                row.removeField("_id");
+
+                boolean blocked = false;
+                Object remarksObj = row.get("remarksSet");
+                if (remarksObj instanceof List) {
+                    for (Object r : (List<?>) remarksObj) {
+                        if (r != null && "Rejected".equals(r.toString())) { blocked = true; break; }
+                    }
+                }
+                row.put("isSkillBlocked", blocked);
+                row.removeField("remarksSet");
+
+                Set<Integer> collIds = new java.util.LinkedHashSet<>();
+                Object agents = row.get("aiAgents");
+                if (agents instanceof List) {
+                    for (Object a : (List<?>) agents) {
+                        if (a == null) continue;
+                        List<Integer> ids = hostToCollectionIds.get(a.toString());
+                        if (ids != null) collIds.addAll(ids);
+                    }
+                }
+                row.put("apiCollectionIds", new ArrayList<>(collIds));
+                row.put("apiAccessTypes", new ArrayList<>());
+            }
+
+            response = new BasicDBObject();
+            response.put("skills", rows);
+            response.put("total", totalCount);
+            return SUCCESS.toUpperCase();
+        } catch (Exception e) {
+            loggerMaker.errorAndAddToDb("Error fetching skills: " + e.getMessage(), LogDb.DASHBOARD);
+            addActionError("Error fetching skills: " + e.getMessage());
+            return ERROR.toUpperCase();
+        }
+    }
+
     public String fetchMcpAuditInfoByCollection() {
         mcpAuditInfoList = new ArrayList<>();
 
@@ -117,7 +306,10 @@ public class AuditDataAction extends UserAction {
                 loggerMaker.errorAndAddToDb("MCP server name is null or empty for collection: " + apiCollection.getHostName() + " id: " + apiCollectionId, LogDb.DASHBOARD);
                 return SUCCESS.toUpperCase();
             }
-            Bson filter = Filters.eq(McpAuditInfo.MCP_HOST, mcpName);
+            Bson filter = Filters.and(
+                Filters.eq(McpAuditInfo.MCP_HOST, mcpName),
+                Filters.ne(McpAuditInfo.TYPE, "AGENT_SKILL")
+            );
             mcpAuditInfoList = McpAuditInfoDao.instance.findAll(filter, 0, 1_000, null);
             return SUCCESS.toUpperCase();
         } catch (Exception e) {
@@ -142,13 +334,13 @@ public class AuditDataAction extends UserAction {
             List<Integer> collectionsIds = UsersCollectionsList.getCollectionsIdForUser(Context.userId.get(),
                 Context.accountId.get());
 
+            // Skills now live in api_info (ApiInfo.isSkillBlocked); the audit-data table
+            // shows MCP records only. Re-exclude AGENT_SKILL so legacy skill rows that may
+            // still sit in mcp_audit_info do not double-surface on the All / MCP tabs.
             Bson filter = Filters.and(
                 Filters.eq(McpAuditInfo.CONTEXT_SOURCE, Context.contextSource.get().name()),
                 Filters.ne(McpAuditInfo.TYPE, "AGENT_SKILL")
             );
-            // Legacy records (written before contextSource was tracked) have no contextSource field.
-            // Surface them on the strict-path too: scope to the user's allowed collections when RBAC
-            // is active, otherwise (admins) include all such records.
             List<Bson> legacyParts = new ArrayList<>();
             legacyParts.add(Filters.exists(McpAuditInfo.CONTEXT_SOURCE, false));
             legacyParts.add(Filters.ne(McpAuditInfo.TYPE, "AGENT_SKILL"));
