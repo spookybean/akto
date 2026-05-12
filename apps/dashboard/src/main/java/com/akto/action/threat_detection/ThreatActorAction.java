@@ -35,9 +35,6 @@ import software.amazon.awssdk.services.wafv2.model.GetIpSetResponse;
 import software.amazon.awssdk.services.wafv2.model.UpdateIpSetRequest;
 import software.amazon.awssdk.services.wafv2.model.Wafv2Exception;
 
-import lombok.Getter;
-import lombok.Setter;
-
 import java.util.*;
 import java.util.stream.Collectors;
 import org.apache.http.client.methods.CloseableHttpResponse;
@@ -50,8 +47,6 @@ import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.bson.conversions.Bson;
 
-@Getter
-@Setter
 public class ThreatActorAction extends AbstractThreatDetectionAction {
 
   List<DashboardThreatActor> actors;
@@ -458,6 +453,14 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
     }
 
 
+    public List<String> getActorIps() {
+        return actorIps;
+    }
+
+    public void setActorIps(List<String> actorIps) {
+        this.actorIps = actorIps;
+    }
+
     public String modifyThreatActorStatus() {
         Wafv2Client wafClient = null;
         int accId = Context.accountId.get();
@@ -667,4 +670,191 @@ public class ThreatActorAction extends AbstractThreatDetectionAction {
       return SUCCESS.toUpperCase();
     }
 
+  public int getSkip() {
+    return skip;
+  }
+
+  public void setSkip(int skip) {
+    this.skip = skip;
+  }
+
+  public String getCursor() {
+    return cursor;
+  }
+
+  public void setCursor(String cursor) {
+    this.cursor = cursor;
+  }
+
+  public List<String> getLatestAttack() {
+    return latestAttack;
+  }
+
+  public void setLatestAttack(List<String> latestAttack) {
+    this.latestAttack = latestAttack;
+  }
+
+  public static int getLimit() {
+    return LIMIT;
+  }
+
+  public long getTotal() {
+    return total;
+  }
+
+  public void setTotal(long total) {
+    this.total = total;
+  }
+
+  public List<DashboardThreatActor> getActors() {
+    return actors;
+  }
+
+  public void setActors(List<DashboardThreatActor> actor) {
+    this.actors = actor;
+  }
+
+  public List<ThreatActorPerCountry> getActorsCountPerCountry() {
+    return actorsCountPerCountry;
+  }
+
+  public void setActorsCountPerCountry(List<ThreatActorPerCountry> actorsCountPerCountry) {
+    this.actorsCountPerCountry = actorsCountPerCountry;
+  }
+
+  public List<MaliciousPayloadsResponse> getMaliciousPayloadsResponses() {
+    return maliciousPayloadsResponses;
+  }
+
+  public void setMaliciousPayloadsResponses(List<MaliciousPayloadsResponse> maliciousPayloadsResponses) {
+    this.maliciousPayloadsResponses = maliciousPayloadsResponses;
+  }
+
+  public String getRefId() {
+    return refId;
+  }
+
+  public void setRefId(String refId) {
+    this.refId = refId;
+  }
+
+  public List<String> getCountry() {
+    return country;
+  }
+  
+  public void setCountry(List<String> country) {
+    this.country = country;
+  }
+
+  public int getStartTs() {
+    return startTs;
+  }
+
+  public void setStartTs(int startTs) {
+    this.startTs = startTs;
+  }
+
+  public int getEndTs() {
+    return endTs;
+  }
+
+  public void setEndTs(int endTs) {
+    this.endTs = endTs;
+  }
+
+  public String getSplunkUrl() {
+    return splunkUrl;
+  }
+
+  public void setSplunkUrl(String splunkUrl) {
+    this.splunkUrl = splunkUrl;
+  }
+
+  public String getSplunkToken() {
+    return splunkToken;
+  }
+
+  public void setSplunkToken(String splunkToken) {
+    this.splunkToken = splunkToken;
+  }
+
+  public String getActorIp() {
+    return actorIp;
+  }
+
+  public void setActorIp(String actorIp) {
+    this.actorIp = actorIp;
+  }
+
+  public String getStatus() {
+    return status;
+  }
+
+  public void setStatus(String status) {
+    this.status = status;
+  }
+  
+  public List<String> getActorId() {
+    return actorId;
+  }
+
+  public void setActorId(List<String> actorId) {
+    this.actorId = actorId;
+  }
+
+  public List<String> getHost() {
+    return host;
+  }
+
+  public void setHost(List<String> host) {
+    this.host = host;
+  }
+
+  public String getEventType() {
+    return eventType;
+  }
+
+  public void setEventType(String eventType) {
+    this.eventType = eventType;
+  }
+
+  public String getActor() {
+    return actor;
+  }
+
+  public void setActor(String actor) {
+    this.actor = actor;
+  }
+
+  public String getFilterId() {
+    return filterId;
+  }
+
+  public void setFilterId(String filterId) {
+    this.filterId = filterId;
+  }
+
+  public Map<String, Integer> getSort() {
+    return sort;
+  }
+
+  public void setSort(Map<String, Integer> sort) {
+    this.sort = sort;
+  }
+
+  public List<ActivityData> getActorActivities() {
+    return actorActivities;
+  }
+
+  public void setActorActivities(List<ActivityData> actorActivities) {
+    this.actorActivities = actorActivities;
+  }
+
+  public List<BasicDBObject> getThreatComplianceInfos() {
+    return threatComplianceInfos;
+  }
+
+  public void setThreatComplianceInfos(List<BasicDBObject> threatComplianceInfos) {
+    this.threatComplianceInfos = threatComplianceInfos;
+  }
 }
