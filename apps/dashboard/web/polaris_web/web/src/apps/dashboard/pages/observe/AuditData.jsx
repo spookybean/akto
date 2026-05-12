@@ -167,6 +167,13 @@ const headingsSkills = [
         text: "Status",
         value: "statusComp",
     },
+    {
+        title: 'Marked By',
+        text: "Marked By",
+        value: "markedBy",
+        type: CellType.TEXT,
+        filterKey: 'markedBy',
+    },
 ]
 
 const sortOptions = [
@@ -822,6 +829,7 @@ function AuditData() {
                     const mcpHost = r?.mcpHost || '-';
                     const lastSeen = typeof r?.lastDetected === 'number' ? r.lastDetected : 0;
                     const isBlocked = r?.remarks === 'Rejected';
+                    const markedBy = r?.markedBy || '-';
                     const rowHexId = r?.hexId || r?.id || `${skillName}::${mcpHost}::${lastSeen}`;
                     const collectionIds = (typeof r?.hostCollectionId === 'number' && r.hostCollectionId > 0)
                         ? [r.hostCollectionId]
@@ -836,6 +844,7 @@ function AuditData() {
                         isSkillBlocked: isBlocked,
                         lastSeen,
                         lastDetectedComp: lastSeen ? func.prettifyEpoch(lastSeen) : '-',
+                        markedBy,
                         // AI agent name with logo — same pattern as MCP-server tab's aiAgentNameComp.
                         collectionsComp: mcpHost === '-' ? (
                             <Text>-</Text>
