@@ -89,14 +89,6 @@ export default {
         });
         return resp || { auditData: [], total: 0 };
     },
-    async updateSkillBlockStatus(apiCollectionIds, skillName, isSkillBlocked, mcpHosts) {
-        return request({
-            url: '/api/updateSkillBlockStatus',
-            method: 'post',
-            data: { apiCollectionIds, skillName, isSkillBlocked, mcpHosts: mcpHosts || [] }
-        });
-    },
-
     async fetchMcpAuditInfoByCollection(apiCollectionId) {
         const id = typeof apiCollectionId === 'string' ? parseInt(apiCollectionId, 10) : apiCollectionId;
         const resp = await request({

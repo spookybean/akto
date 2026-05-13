@@ -5,6 +5,7 @@ import { useEffect, useMemo, useReducer, useRef, useState } from "react"
 import values from "@/util/values";
 import {produce} from "immer"
 import api from "./api"
+import collectionApi from "./api_collections/api"
 import func from "@/util/func"
 import DateRangeFilter from "../../components/layouts/DateRangeFilter";
 import PageWithMultipleCards from "../../components/layouts/PageWithMultipleCards";
@@ -671,7 +672,7 @@ function AuditData() {
         }
         try {
             await Promise.all(validRows.map((r) =>
-                api.updateSkillBlockStatus(
+                collectionApi.updateSkillBlockStatus(
                     r.apiCollectionIds || [],
                     r.skillName,
                     isBlocked,
