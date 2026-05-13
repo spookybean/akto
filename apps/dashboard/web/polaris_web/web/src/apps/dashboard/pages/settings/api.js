@@ -1101,6 +1101,13 @@ const settingRequests = {
             data: {}
         })
     },
+    updateAccountDomains(domainKey, domainsToAdd, domainsToRemove) {
+        return request({
+            url: '/api/updateAccountDomains',
+            method: 'post',
+            data: { domainKey, domainsToAdd, domainsToRemove }
+        })
+    }
 }
 
 export default settingRequests
