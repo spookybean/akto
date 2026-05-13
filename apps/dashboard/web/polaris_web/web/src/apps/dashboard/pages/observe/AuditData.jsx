@@ -1016,7 +1016,7 @@ function AuditData() {
 
         const countSkills = async () => {
             try {
-                const res = await api.fetchSkills(0, 1, 'lastSeen', -1, '');
+                const res = await api.fetchSkillsData(0, 1, 'lastDetected', -1, {}, '');
                 return res?.total || 0;
             } catch {
                 return 0;
