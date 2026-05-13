@@ -184,13 +184,12 @@ function PatternSettingsPage({
 
     return (
         <>
-            {addModal}
             <PageWithMultipleCards
                 title={title}
                 isFirstPage={true}
                 primaryAction={{ content: `Add ${resourceName.singular}`, onAction: () => setAddModalOpen(true) }}
                 secondaryActions={secondaryActions}
-                components={[inputCard, tableCard, ...(additionalCards || [])]}
+                components={[addModal, tableCard, ...(additionalCards || [])]}
             />
         </>
     )
