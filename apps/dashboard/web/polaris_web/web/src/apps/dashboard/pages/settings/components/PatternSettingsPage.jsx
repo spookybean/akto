@@ -48,6 +48,7 @@ function PatternSettingsPage({
     getRowActions,
     secondaryActions,
     initialValue,
+    additionalCards = [],
 }) {
     const tableHeaders = headers || DEFAULT_HEADERS
     const [value, setValue] = useState('')
@@ -190,7 +191,7 @@ function PatternSettingsPage({
                 isFirstPage={true}
                 primaryAction={{ content: `Add ${resourceName.singular}`, onAction: () => setAddModalOpen(true) }}
                 secondaryActions={secondaryActions}
-                components={[tableCard, ...(additionalCards || [])]}
+                components={[inputCard, tableCard, ...(additionalCards || [])]}
             />
         </>
     )
