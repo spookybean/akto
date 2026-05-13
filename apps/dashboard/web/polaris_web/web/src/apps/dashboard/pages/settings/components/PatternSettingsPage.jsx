@@ -43,12 +43,11 @@ function PatternSettingsPage({
     patternKey,
     headers,
     buildRow,
-    additionalCards,
+    additionalCards = [],
     onRowClick,
     getRowActions,
     secondaryActions,
-    initialValue,
-    additionalCards = [],
+    initialValue
 }) {
     const tableHeaders = headers || DEFAULT_HEADERS
     const [value, setValue] = useState('')
