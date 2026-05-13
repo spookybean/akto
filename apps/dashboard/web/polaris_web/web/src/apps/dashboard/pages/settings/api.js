@@ -1079,6 +1079,13 @@ const settingRequests = {
             method: 'post',
             data: {patternValue, connectorType}
         })
+    },
+    updateAccountDomains(domainKey, domainsToAdd, domainsToRemove) {
+        return request({
+            url: '/api/updateAccountDomains',
+            method: 'post',
+            data: { domainKey, domainsToAdd, domainsToRemove }
+        })
     }
 }
 

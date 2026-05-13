@@ -678,6 +678,7 @@
             </result>
         </action>
 
+
         <action name="signup-email" class="com.akto.action.SignupAction" method="registerViaEmail">
             <interceptor-ref name="json"/>
             <interceptor-ref name="defaultStack" />
@@ -5147,7 +5148,9 @@
                 <param name="ignoreHierarchy">false</param>
                 <param name="includeProperties">^actionErrors.*</param>
             </result>
-            <result name="SUCCESS"  type="json"/>
+            <result name="SUCCESS" type="json">
+                <param name="excludeProperties">chattyDomains,aiDomains,domainKey,domainsToAdd,domainsToRemove,deletedPatternResult,patternValue,connectorType</param>
+            </result>
         </action>
 
         <action name="api/updatePrivateCidrIps" class="com.akto.action.AdminSettingsAction" method="editPrivateCidrList">
@@ -5235,6 +5238,30 @@
             </result>
             <result name="SUCCESS" type="json">
                 <param name="root">deletedPatternResult</param>
+            </result>
+            <result name="ERROR" type="json">
+                <param name="statusCode">422</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+        </action>
+
+        <action name="api/updateAccountDomains" class="com.akto.action.AdminSettingsAction" method="updateAccountDomains">
+            <interceptor-ref name="json"/>
+            <interceptor-ref name="defaultStack" />
+            <interceptor-ref name="roleAccessInterceptor">
+                <param name="featureLabel">ADMIN_ACTIONS</param>
+                <param name="accessType">READ_WRITE</param>
+                <param name="actionDescription">User updated account domain list</param>
+            </interceptor-ref>
+            <result name="FORBIDDEN" type="json">
+                <param name="statusCode">403</param>
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^actionErrors.*</param>
+            </result>
+            <result name="SUCCESS" type="json">
+                <param name="ignoreHierarchy">false</param>
+                <param name="includeProperties">^chattyDomains.*,^aiDomains.*</param>
             </result>
             <result name="ERROR" type="json">
                 <param name="statusCode">422</param>
