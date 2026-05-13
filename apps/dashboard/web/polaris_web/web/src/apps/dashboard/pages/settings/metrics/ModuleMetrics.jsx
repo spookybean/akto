@@ -34,6 +34,15 @@ function moduleDisplayNameKey(module) {
     return module?.name || module?.id || ''
 }
 
+/** Value typically stored on {@code metrics_data.instanceId} (e.g. TC prod uses {@code ModuleInfo.name}; JVM paths may use id). */
+function metricsSeriesInstanceKey(module) {
+    if (!module) return null
+    const n = module.name
+    if (n != null && String(n).trim() !== '') return n
+    if (module.id != null && String(module.id).trim() !== '') return module.id
+    return null
+}
+
 /**
  * @param {Array} modules Raw module infos from the API
  * @param {{ nowSec: number, showLiveOnly: boolean, showLiveModulesFilter: boolean }} opts
@@ -60,7 +69,7 @@ function buildModuleDropdownOptions(modules, opts) {
     return sorted.map((module) => {
         const online = isModuleOnline(module, nowSec)
         const baseName = moduleDisplayNameKey(module)
-        const moduleId = module?.id != null && String(module.id) !== '' ? module.id : baseName
+        const moduleId = module?.id != null && String(module.id).trim() !== '' ? module.id : baseName
         const disambiguate = nameCounts[baseName] > 1 && module?.id
         const displayName = disambiguate ? `${baseName} (${String(module.id).slice(0, 8)})` : baseName
         return {
@@ -102,6 +111,11 @@ function ModuleMetrics({ config }) {
 
     const getChartOptions = useChartOptions(config.enableLegends)
 
+    const selectedModule = allModules.find((m) => m.id === selectedInstanceId)
+        ?? allModules.find((m) => metricsSeriesInstanceKey(m) === selectedInstanceId)
+        ?? null
+    const metricsFilterKey = metricsSeriesInstanceKey(selectedModule) ?? selectedInstanceId
+
     const fetchModuleInfo = useCallback(async () => {
         try {
             const filter = {
@@ -115,8 +129,8 @@ function ModuleMetrics({ config }) {
         }
     }, [config.moduleType, startTime, endTime])
 
-    const fetchAndProcessMetrics = useCallback(async (instanceId) => {
-        if (instanceId == null || instanceId === '') {
+    const fetchAndProcessMetrics = useCallback(async (metricsInstanceKey) => {
+        if (metricsInstanceKey == null || metricsInstanceKey === '') {
             setOrderedResult([])
             return
         }
@@ -124,11 +138,11 @@ function ModuleMetrics({ config }) {
             let data
             if (config.fetchStrategy === 'prefix') {
                 data = await settingFunctions.fetchAllMetricsData(
-                    startTime, endTime, config.metricPrefix, instanceId
+                    startTime, endTime, config.metricPrefix, metricsInstanceKey
                 )
             } else if (config.fetchStrategy === 'moduleType') {
                 data = await settingFunctions.fetchMetricsDataByModule(
-                    startTime, endTime, config.moduleType, instanceId
+                    startTime, endTime, config.moduleType, metricsInstanceKey
                 )
             }
 
@@ -225,8 +239,8 @@ function ModuleMetrics({ config }) {
     }, [allModules, showLiveModulesOnly, config.showLiveModulesFilter])
 
     useEffect(() => {
-        fetchAndProcessMetrics(selectedInstanceId)
-    }, [selectedInstanceId, startTime, endTime, fetchAndProcessMetrics])
+        fetchAndProcessMetrics(metricsFilterKey)
+    }, [metricsFilterKey, startTime, endTime, fetchAndProcessMetrics])
 
     return (
         <Page
@@ -281,10 +295,10 @@ function ModuleMetrics({ config }) {
                             </HorizontalStack>
                         </HorizontalStack>
 
-                        {selectedInstanceId && moduleInfoData[selectedInstanceId] && (
+                        {metricsFilterKey && moduleInfoData[metricsFilterKey] && (
                             <SystemInfoBox
-                                instanceId={selectedInstanceId}
-                                data={moduleInfoData[selectedInstanceId]}
+                                instanceId={metricsFilterKey}
+                                data={moduleInfoData[metricsFilterKey]}
                                 fields={config.systemInfoFields}
                             />
                         )}
